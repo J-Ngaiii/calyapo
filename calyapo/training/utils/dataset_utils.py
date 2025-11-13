@@ -3,9 +3,9 @@
 
 import torch
 
-from llama_cookbook.data.concatenator import ConcatDataset
-from llama_cookbook.datasets import DATASET_PREPROC, DATALOADER_COLLATE_FUNC
-from llama_cookbook.utils.config_utils import get_dataloader_kwargs
+from calyapo.training.data.concatenator import ConcatDataset
+from calyapo.training.datasets import DATASET_PREPROC, DATALOADER_COLLATE_FUNC
+from calyapo.training.utils.config_utils import get_dataloader_kwargs
 
 
 def get_preprocessed_dataset(
