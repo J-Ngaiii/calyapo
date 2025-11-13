@@ -6,7 +6,7 @@
 import copy
 import datasets
 import itertools
-from llama_cookbook.inference.prompt_format_utils import  LLAMA_GUARD_3_CATEGORY
+from calyapo.training.inference.prompt_format_utils import  LLAMA_GUARD_3_CATEGORY
 import ast
 import fire
 
