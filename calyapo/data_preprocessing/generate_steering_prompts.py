@@ -2,12 +2,10 @@ import pandas as pd
 import json
 
 def create_steering_prompt(row):
-    # Convert your one-hot/categorical columns into a string representation
-    # Example: row['race'] might be 1 for Hispanic, 2 for White, etc.
     
     demographics = []
-    if row['party'] == 'Democrat': demographics.append("Democrat")
-    elif row['party'] == 'Republican': demographics.append("Republican")
+    if row['partyid'].lower() == 'democrat': demographics.append("Democrat")
+    elif row['partyid'].lower() == 'republican': demographics.append("Republican")
     
     if row['race'] == 'Hispanic': demographics.append("Hispanic")
     # ... add other features ...
