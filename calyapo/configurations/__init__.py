@@ -1,0 +1,1 @@
+from calyapo.configurations.config import *

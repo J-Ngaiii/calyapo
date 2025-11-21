@@ -9,3 +9,6 @@ CalyAPO is Jonathan Ngai's Data Science Honors Thesis repository for analyzing C
 - in dataset_utils define the data collator, loader and getter 
 - modify train_utils.py in training/utils with relevant config and different modes
 - modify the finetuning.py script
+
+# Idea
+- Clean and store steering prompts into jsons (can be done seperately outside of GPU memory)
