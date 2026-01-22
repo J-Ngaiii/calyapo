@@ -1,5 +1,6 @@
 from calyapo.configurations.data_mappings import FULL_DATA_MAPS
 from calyapo.configurations.config import DATA_PATHS
+import pandas as pd
 
 
 from typing import Dict, Any
