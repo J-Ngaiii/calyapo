@@ -1,7 +1,15 @@
 from pathlib import Path
-base_dir = Path.cwd()
 
+UNIVERSAL_FINAL_FOLDER = Path('calyapo/data/final')
 DATA_PATHS = {
-    'IGS' : base_dir / 'data' / 'raw' / 'igs' , 
-    'PPIC' : base_dir / 'data' / 'raw' / 'ppic' 
+    'IGS' : {
+        'raw' : Path('calyapo/data/raw/igs'), 
+        'processed' : Path('calyapo/data/processed/igs'), 
+        'final' : UNIVERSAL_FINAL_FOLDER
+    }, 
+    'PPIC' : {
+        'raw' : Path('calyapo/data/raw/ppic'), 
+        'processed' : Path('calyapo/data/processed/ppic'), 
+        'final' : UNIVERSAL_FINAL_FOLDER
+    }
 }
