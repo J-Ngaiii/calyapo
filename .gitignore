@@ -1,1 +1,4 @@
-*DS_Store*
+*.DS_Store*
+*egg*
+*pycache*
+.DS_Store

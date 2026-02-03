@@ -8,13 +8,15 @@ ALL_DATA_MAPS = {
 IGS_IDEO_IDEO = {
     'demo' : ['age', 'partyid'], 
     'train_resp' : ['ideology'], 
-    'val_resp' : ['ideology']
+    'val_resp' : ['ideology'], 
+    'test_resp' : ['ideology']
 }
 
 IGS_IDEO_TRUMP =  {
     'demo' : ['age', 'partyid'], 
     'train_resp' : ['ideology'], 
-    'val_resp' : ['trump_opinion']
+    'val_resp' : ['trump_opinion'], 
+    'test_resp' : ['abortion_senate']
 }
 
 # all plans

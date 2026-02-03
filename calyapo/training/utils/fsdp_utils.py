@@ -5,7 +5,7 @@ import torch
 import torch.cuda.nccl as nccl
 import torch.distributed as dist
 
-from llama_cookbook.policies import fpSixteen,bfSixteen, get_llama_wrapper
+from calyapo.policies import fpSixteen,bfSixteen, get_llama_wrapper
 from torch.distributed.device_mesh import init_device_mesh
 from accelerate.utils import is_xpu_available
 
