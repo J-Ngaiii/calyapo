@@ -77,3 +77,7 @@ clean_datasets --> turns it into jsons binding
 # Other files
 - Concatenator: no changes needed
 - Sampler: no changes needed
+
+# Quick Commands
+- Clean Dataset: python calyapo/data_preprocessing/clean_datasets.py
+- Split Data: python calyapo/data_preprocessing/data_combiner.py
