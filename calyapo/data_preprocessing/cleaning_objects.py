@@ -105,12 +105,21 @@ class Individual:
             
         return decoders
     
-    def _process_response(self, variable_label: str, raw_val: Any):
+    def _process_response(self, variable_label: str, raw_val: Any, debug_var_label = None):
         """Helper to decode a raw value into text."""
         # debug this
-        raw_str = str(raw_val)
-        if variable_label in self.opt_decoders and raw_val in self.opt_decoders[variable_label]:
-            return self.opt_decoders[variable_label][raw_val]
+        raw_str = str(raw_val).strip()
+
+        if variable_label == debug_var_label:
+            print(f"raw val: ", raw_str)
+            print(f"var label: ", variable_label)
+            print(f"decoder: ", self.opt_decoders)
+
+            print("label existence: ", variable_label in self.opt_decoders)
+            print("raw value existence: ", raw_str in self.opt_decoders[variable_label])
+
+        if variable_label in self.opt_decoders and raw_str in self.opt_decoders[variable_label]:
+            return self.opt_decoders[variable_label][raw_str]
         
         try:
             raw_int = int(float(raw_str)) # Handle "1.0" -> 1
@@ -178,6 +187,8 @@ class Individual:
 
     def add_demog(self, variable_label, raw_val):
         decoded = self._process_response(variable_label, raw_val)
+        if variable_label == 'partyid':
+            print(f"decoded val: ", decoded)
         self.demog[variable_label] = str(decoded)
 
     def add_train(self, variable_label, raw_val):
