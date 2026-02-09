@@ -74,7 +74,7 @@ def setup_wandb(train_config, fsdp_config, **kwargs):
             "You are trying to use wandb which is not currently installed. "
             "Please install it using pip install wandb"
         )
-    from llama_cookbook.configs import wandb_config as WANDB_CONFIG
+    from calyapo.training.configs import wandb_config as WANDB_CONFIG
 
     wandb_config = WANDB_CONFIG()
     update_config(wandb_config, **kwargs)

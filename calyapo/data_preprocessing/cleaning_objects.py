@@ -23,11 +23,48 @@ class DataPackage:
         self.time_period = time_period
         self.data_store = {}
 
-    def add_data(self, keyword: str, data: Any):
-        self.data_store[keyword] = data
+    # ----------------------------
+    # Dictionary Emulation Methods
+    # ----------------------------
 
-    def get_data(self, keyword):
-        return self.data_store.get(keyword) 
+    def __getitem__(self, key: str) -> Any:
+        """Allows access via package['key']"""
+        return self.data_store[key]
+
+    def __setitem__(self, key: str, value: Any):
+        """Allows assignment via package['key'] = value"""
+        self.data_store[key] = value
+
+    def __contains__(self, key: str) -> bool:
+        """Allows checks via 'key' in package"""
+        return key in self.data_store
+
+    def __repr__(self):
+        """Nice string representation for debugging"""
+        return f"<DataPackage: {self.dataset_name} ({self.time_period}) keys={list(self.data_store.keys())}>"
+
+    def get(self, key: str, default=None) -> Any:
+        """Safe retrieval: package.get('missing', None)"""
+        return self.data_store.get(key, default)
+
+    def keys(self):
+        return self.data_store.keys()
+
+    def values(self):
+        return self.data_store.values()
+
+    def items(self):
+        return self.data_store.items()
+
+    # ---------------
+    # Legacy Wrappers
+    # ---------------
+    
+    def add_data(self, keyword: str, data: Any):
+        self[keyword] = data
+
+    def get_data(self, keyword: str):
+        return self.get(keyword)
     
 class Individual:
     def __init__(self, idx, time_period, train_plan, dataset_name, na_filler = UNIVERSAL_NA_FILLER):

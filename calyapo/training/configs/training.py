@@ -6,6 +6,9 @@ from dataclasses import dataclass
 
 @dataclass
 class train_config:
+    """
+    Train config gets called in finetuning.py to populate parameters
+    """
     model_name: str="PATH/to/Model"
     tokenizer_name: str=None
     enable_fsdp: bool=False # shards model parameters, optimizer states and gradients across DDP ranks
@@ -37,7 +40,7 @@ class train_config:
     num_freeze_layers: int = 1
     freeze_LLM_only: bool = False # Freeze self-attention layers in the language_model. Vision model, multi_modal_projector, cross-attention will be fine-tuned
     quantization: str = None
-    one_gpu: bool = False
+    one_gpu: bool = True # switch to true for debugging
     save_model: bool = True
     dist_checkpoint_root_folder: str="PATH/to/save/FSDP/model" # will be used if using FSDP
     dist_checkpoint_folder: str="fine-tuned" # will be used if using FSDP

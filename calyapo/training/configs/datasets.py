@@ -41,7 +41,8 @@ class llamaguard_toxicchat_dataset:
 
 @dataclass
 class igs_dataset:
-    dataset: str = "igs_dataset"
-    file: str = "calyapo/training/datasets/igs_dataset.py"
-    train_split: str = "subpop/data/"
-    test_split: str = "test"
+    dataset: str = "calyapo_dataset"
+    file: str = "calyapo/training/datasets/calyapo_dataset.py"
+    train_split: str = ""
+    val_split: str = ""
+    test_split: str = ""
