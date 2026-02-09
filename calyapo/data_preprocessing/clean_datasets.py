@@ -25,7 +25,7 @@ def process_csv(csv_path: Path, dataset_name: str, train_plan: str) -> DataPacka
     dataset_maps = ALL_DATA_MAPS[dataset_name][time_period]
     var2label = dataset_maps.get('var2label', {})
     label2var = {v: k for k, v in var2label.items()}
-    
+
     # Containers
     cleaned_data = []
     train_data = []
