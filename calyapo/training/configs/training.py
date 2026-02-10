@@ -14,7 +14,7 @@ class train_config:
     enable_fsdp: bool=False # shards model parameters, optimizer states and gradients across DDP ranks
     low_cpu_fsdp: bool=False # saves cpu memory by loading pretrained model on rank0 only
     run_validation: bool=True
-    batch_size_training: int=4
+    batch_size_training: int=1 # set to one for debugging
     batching_strategy: str="packing" #alternative: padding
     context_length: int=4096
     gradient_accumulation_steps: int=1
@@ -30,7 +30,7 @@ class train_config:
     seed: int=42
     use_fp16: bool=False  # load model paramater in torch.float16 dtype (not recommended)
     mixed_precision: bool=True
-    val_batch_size: int=1
+    val_batch_size: int=1 # set to one for debugging
     dataset = "samsum_dataset"
     peft_method: str = "lora" # None, llama_adapter (Caution: llama_adapter is currently not supported with FSDP)
     use_peft: bool=False # use parameter efficient fine tuning

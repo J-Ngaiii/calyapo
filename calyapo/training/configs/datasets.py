@@ -51,7 +51,6 @@ class calyapo_dataset_config:
 @dataclass
 class ideology_to_trump_dataset (calyapo_dataset_config):
     dataset: str = "ideo2trump" # override parent class
-    
     train_split: str = f"{str(UNIVERSAL_FINAL_FOLDER)}/ideology_to_trump_train.jsonl"
     # map 'test_split' (what Llama expects) to your Validation file (in-sample check)
     test_split: str = f"{str(UNIVERSAL_FINAL_FOLDER)}/ideology_to_trump_val.jsonl"
@@ -62,7 +61,6 @@ class ideology_to_trump_dataset (calyapo_dataset_config):
 @dataclass
 class ideology_to_ideology_dataset (calyapo_dataset_config):
     dataset: str = "ideo2ideo" # override parent class
-    
     train_split: str = f"{str(UNIVERSAL_FINAL_FOLDER)}/ideology_to_ideology_train.jsonl"
     test_split: str = f"{str(UNIVERSAL_FINAL_FOLDER)}/ideology_to_ideology_val.jsonl"
 
