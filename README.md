@@ -81,3 +81,9 @@ clean_datasets --> turns it into jsons binding
 # Quick Commands
 - Clean Dataset: python calyapo/data_preprocessing/clean_datasets.py
 - Split Data: python calyapo/data_preprocessing/data_combiner.py
+- Test Prompt Tokenizer: python calyapo/training/datasets/calyapo_datasets.py
+- Finetune: python -m calyapo.training.finetuning \
+    --dataset "ideology_to_trump_dataset" \
+    --run_validation True \
+    --save_model True \
+    --output_dir "calyapo/training/model_checkpoints"
