@@ -69,21 +69,31 @@ Data in the \data repo but its path is instantiated in the \calyapo\configuratio
 
 clean_datasets --> turns it into jsons binding 
 
-# Changes to Llama Cookbook to implement new dataset
-[Readme]{https://github.com/meta-llama/llama-cookbook/blob/main/getting-started/finetuning/README.md}
-- training/configs/datasets.py: add in a new dataset class
-- training/datasets/: add a igs_dataset.py
-
-# Other files
-- Concatenator: no changes needed
-- Sampler: no changes needed
-
 # Quick Commands
 - Clean Dataset: python calyapo/data_preprocessing/clean_datasets.py
 - Split Data: python calyapo/data_preprocessing/data_combiner.py
-- Test Prompt Tokenizer: python calyapo/training/datasets/calyapo_datasets.py
+- Test Prompt Tokenizer: python calyapo/training/datasets/calyapo_dataset.py
 - Finetune: python -m calyapo.training.finetuning \
     --dataset "ideology_to_trump_dataset" \
     --run_validation True \
     --save_model True \
     --output_dir "calyapo/training/model_checkpoints"
+
+- Local Windows Finetuning:
+    python -m calyapo.training.finetuning `
+    --dataset "ideology_to_trump_dataset" `
+    --model_name "meta-llama/Llama-2-7b-hf" `
+    --output_dir "calyapo/training/checkpoints/ideology_to_trump" `
+    --batch_size 1 `
+    --micro_batch_size 1 `
+    --gradient_accumulation_steps 4 `
+    --num_epochs 3 `
+    --run_validation True `
+    --save_model True `
+    --use_peft `
+    --peft_method lora `
+    --quantization 4bit `
+    --use_fp16 True `
+    --dataloader_num_workers 0
+
+    - Also need to change finetuning data loaders to have 0 workers

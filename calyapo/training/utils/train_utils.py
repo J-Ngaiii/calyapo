@@ -22,7 +22,7 @@ import json
 from calyapo.training.model_checkpointing import save_fsdp_model_checkpoint_full, save_model_and_optimizer_sharded, save_optimizer_checkpoint, save_peft_checkpoint, save_model_checkpoint
 from calyapo.training.policies import fpSixteen,bfSixteen, get_llama_wrapper
 from calyapo.training.utils.memory_utils import MemoryTrace
-from calyapo.training.utils import is_xpu_available, is_ccl_available
+from accelerate.utils import is_xpu_available, is_ccl_available
 from calyapo.training.utils.flop_utils import FlopMeasure
 def set_tokenizer_params(tokenizer: LlamaTokenizer):
     tokenizer.pad_token_id = 0
