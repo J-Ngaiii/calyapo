@@ -12,7 +12,7 @@
 # Four times the number of GPUs for A500 in savio4_gpu
 #SBATCH --cpus-per-task=4
 
-#Number and type of GPUs
+# Number and type of GPUs
 #SBATCH --gres=gpu:A5000:1
 #SBATCH --qos=a5k_gpu4_normal
 
@@ -75,6 +75,7 @@ print_header() {
 print_header
 
 # --- Run Training with torchrun ---
+# NO SPACES AFTER THE BACKSLACH
 torchrun --nnodes=1 \
     --nproc-per-node=${NPROC_PER_NODE} \
     --master_port=${MASTER_PORT} \
@@ -83,7 +84,7 @@ torchrun --nnodes=1 \
     --low_cpu_fsdp \
     --fsdp_config.pure_bf16 \
     --use_peft=${USE_PEFT} \
-    --use_fast_kernels \ 
+    --use_fast_kernels \
     --checkpoint_type StateDictType.FULL_STATE_DICT \
     --peft_method='lora' \
     --use_fp16 \
@@ -97,14 +98,14 @@ torchrun --nnodes=1 \
     --dataset ${DATASET} \
     --output_dir ${OUTPUT_DIR} \
     --dataset_path ${DATASET_PATH} \
-    --model_name ${MODEL_NAME_OR_PATH} \
+    --model_name ${MODEL_NAME} \
     --model_nickname ${MODEL_NICKNAME} \
     --num_workers_dataloader ${NUM_WORKERS_DATALOADER} \
     --lr ${LR} \
     --num_epochs ${NUM_EPOCHS} \
     --weight_decay ${WEIGHT_DECAY} \
-    --gamma ${GAMMA} \ 
-    --seed: 42 \
+    --gamma ${GAMMA} \
+    --seed 42 \
     --one_gpu ${ONE_GPU} \
     --use_wandb \
     --save_model \
