@@ -2,4 +2,6 @@
 *egg*
 *pycache*
 .DS_Store
-login_hf.py
+login_hf.py.env
+**env**
+wandb
