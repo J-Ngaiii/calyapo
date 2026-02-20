@@ -1,9 +1,122 @@
 
 from typing import List, Dict, Any
 import string
+import json
+from pathlib import Path
+import pandas as pd
 
 from calyapo.configurations.data_map_config import ALL_DATA_MAPS, TRAIN_PLANS
 from calyapo.configurations.config import DATA_PATHS, UNIVERSAL_NA_FILLER
+from calyapo.utils.persistence import *
+
+class Orchestrator:
+    def __init__(self, dataset_name: str, orchestration_plan: Dict):
+        """
+        Takes a orechestration_plan dict:
+        {
+            'num_stages' : 4, 
+            'modules' : {
+                mod1 : {
+                    'functions' : [func_a, func_b], 
+                    'params' : [param_dict_a, param_dict_b], 
+                    'in_path' : "specify", 
+                    'in_types' : [csv, sav], 
+                    'out_path' : "specify", 
+                    'out_type' : "json", 
+                    'save_results' : False, 
+                }, 
+                mod2 : {
+                    'desc' : 'Generating cleaned dataset', 
+                    'functions' : [func_c, func_d], 
+                    'params' : [param_dict_c, param_dict_d], 
+                    'in_path' : "specify", 
+                    'in_types' : [csv, sav], 
+                    'out_path' : "specify", 
+                    'out_type' : "json", 
+                    'save_results' : False, 
+                }
+            }, 
+            'orchestrator_metadata' : {
+                plan_desc : "Calyapo version 0.2 standard orchestration plan", 
+            }
+        }
+        """
+        self.dataset_name = dataset_name
+        self.num_stages = orchestration_plan['num_stages']
+        self.modules = orchestration_plan['modules']
+        self.metadata = orchestration_plan['plan_metadata']
+        self.cleaned_data = self._generate_metadata(self.modules)
+
+    def _generate_metadata(self, modules_dict):
+        outline = []
+        for mod, cfg in modules_dict.items():
+            funcs_str = ", ".join([f"{f.__name__}({p})" for f, p in zip(cfg['functions'], cfg['params'])])
+            outline.append(f"Module {mod} calls: {funcs_str}")
+        
+        self.metadata['plan_outline'] = " | ".join(outline)
+
+    def print_metadata(self):
+        """Prints a clean, formatted summary of the orchestration plan."""
+        print(f"\n------ CALYAPO ORCHESTRATOR: {self.dataset_name} ------ ")
+        
+        print(f"{'Description:':<15} {self.metadata.get('plan_desc', 'N/A')}")
+        print(f"{'Total Stages:':<15} {self.num_stages}")
+        
+        print("\nEXECUTION PIPELINE:")
+        print("-" * 20)
+        
+        for step in self.metadata.get('plan_outline', []):
+            print(f" • {step}")
+
+    def _data_extracter(self, in_path: Path, data_type: str, verbose: bool = False):
+        return file_loader(in_path=in_path, data_type=data_type, verbose=verbose)
+        
+    def _data_saver(self, data: Any, out_path: Path, data_type: str, verbose: bool = False):
+        """
+        Saves data to files based on type. 
+        """
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+                
+        if isinstance(data, pd.DataFrame):
+            data.to_csv(out_path, index=False)
+        elif isinstance(data, (list, dict)):
+            with open(out_path, 'w') as f:
+                json.dump(data, f, indent=4)
+        elif hasattr(data, 'to_dict'):
+            with open(out_path, 'w') as f:
+                json.dump(data.to_dict(), f, indent=4)
+        
+        if verbose: print(f"  [SUCCESS] Results saved to: {out_path}")
+        
+    def execute(self, verbose: bool = False):
+        if verbose: print(f"--- Starting Orchestration: {self.metadata.get('plan_desc', 'Unknown Orchestration Plan')} ---")
+        
+        curr_data = None
+        for mod_name, config in self.modules.items():
+            if verbose: print(f"\n[Stage: {mod_name}]")
+            if config.get('in_path'):
+                curr_data = self._data_extracter(Path(config['in_path']), config.get('in_type', 'csv'), verbose)
+                
+            for func, params in zip(config['functions'], config['params']):
+                if verbose: print(f"  > Executing: {func.__name__} (In-Memory: {config.get('in_memory', True)})")
+                
+                if config.get('in_memory', True):
+                    # standard flow: pass the object directly
+                    curr_data, configs = func(curr_data, **params)
+                else:
+                    in_path = Path(config.get('in_path')) 
+                    curr_data = self._data_extracter(in_path, config.get('in_type', 'csv'), verbose)
+                    curr_data = func(curr_data, **params)
+
+            if config.get('save_results'):
+                out_path = Path(config['out_path'])
+                self._data_saver(curr_data, out_path, config.get('out_type', 'csv'), verbose)
+            else:
+                if verbose: print("  > Stage complete. Results passed in-memory.")
+                
+        self.cleaned_data = curr_data
+        print("\n--- Orchestration Complete ---")
+            
 
 class DataPackage:
     def __init__(self, dataset_name: str, train_plan: str, time_period: str):
@@ -42,6 +155,38 @@ class DataPackage:
     def __repr__(self):
         """Nice string representation for debugging"""
         return f"<DataPackage: {self.dataset_name} ({self.time_period}) keys={list(self.data_store.keys())}>"
+    
+    def to_dict(self) -> dict:
+        """
+        Flattens metadata and data_store into a single dictionary.
+        
+        NOTE: If a key in data_store matches a metadata field name, 
+        the data_store value will overwrite the metadata.
+        """
+        return {
+            "dataset_name": self.dataset_name,
+            "train_plan": self.train_plan,
+            "time_period": self.time_period,
+            **self.data_store  # unpacks all key-value pairs 
+        }
+    
+    @classmethod
+    def from_dict(cls, data: dict) -> 'DataPackage':
+        """
+        Creates a DataPackage instance from a flattened dictionary.
+        """
+        dataset_name = data.get("dataset_name", "unknown")
+        train_plan = data.get("train_plan", "unknown")
+        time_period = data.get("time_period", "unknown")
+
+        instance = cls(dataset_name, train_plan, time_period) # cls represents the class itself, this is an init statement
+
+        metadata_keys = {"dataset_name", "train_plan", "time_period"}
+        for key, value in data.items():
+            if key not in metadata_keys:
+                instance[key] = value
+
+        return instance
 
     def get(self, key: str, default=None) -> Any:
         """Safe retrieval: package.get('missing', None)"""
