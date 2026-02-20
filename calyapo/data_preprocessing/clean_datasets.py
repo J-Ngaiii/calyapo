@@ -7,20 +7,26 @@ from calyapo.configurations.data_map_config import ALL_DATA_MAPS
 from calyapo.configurations.config import DATA_PATHS, UNIVERSAL_NA_FILLER
 from calyapo.data_preprocessing.cleaning_objects import Individual, TrainPlanWrapper, DataPackage
 
-def process_csv(csv_path: Path, dataset_name: str, train_plan: str, debug: bool = False) -> DataPackage:
+def process_csv(data: Path|pd.Dataframe, dataset_name: str, train_plan: str, debug: bool = False, verbose: bool = False) -> DataPackage:
     """
-    Process a single CSV file and return a DataPackage.
+    Process a single CSV file or dataframe and return a DataPackage.
     """
-    time_period = csv_path.stem.split('_')[-1] # e.g. '2024'
+    if isinstance(data, Path):
+        time_period = data.stem.split('_')[-1]
+        df = pd.read_csv(data)
+    elif isinstance(data, pd.DataFrame):
+        df = data
+        if 'time_period' in df.columns:
+            # previous functions should create this col for in-memory processing
+            time_period = str(df['time_period'].iloc[0])
+        else:
+            time_period = UNIVERSAL_NA_FILLER
 
     if time_period not in ALL_DATA_MAPS.get(dataset_name, {}):
-        print(f"  Warning: No config map for {time_period}. Skipping.")
+        if verbose: print(f"  Warning: No mapping for {dataset_name} in {time_period}. Skipping.")
         return None
 
-    df = pd.read_csv(csv_path)
-
-    if debug:
-        print(f"Base df:\n{df}")
+    if debug: print(f"Base df:\n{df}")
     
     tp_wrap = TrainPlanWrapper(dataset_name, train_plan) # validates train_plan and dataset_name
     dataset_maps = ALL_DATA_MAPS[dataset_name][time_period]
@@ -79,29 +85,41 @@ def process_csv(csv_path: Path, dataset_name: str, train_plan: str, debug: bool 
     return pack
 
 
-def build_steering_dataset(dataset_name: str, train_plan: str = "ideology_to_trump", save: bool = True, debug: bool = False):
+def build_steering_dataset(
+        data: List[pd.DataFrame], 
+        dataset_name: str, 
+        train_plan: str = "ideology_to_trump", 
+        in_path: str = None, 
+        out_path: str = None, 
+        save: bool = True, 
+        debug: bool = False, 
+        verbose: bool = False):
     """
     Main Driver: Iterates through all CSVs for a dataset, cleans them, saves intermediates,
     and returns a combined DataPackage.
     """
     # data paths needed for saving
-    if dataset_name not in DATA_PATHS:
-        raise ValueError(f"No path for {dataset_name}")
-    
-    raw_dir = DATA_PATHS[dataset_name]['raw']
-    csv_files = list(raw_dir.glob('*.csv'))
-    
-    if not csv_files:
-        raise FileNotFoundError(f"No CSVs in {raw_dir}")
-    print(f"Found {len(csv_files)} files for {dataset_name}.")
+    if data is not None:
+        if debug: print(f"Processing {len(data)} DataFrames passed in-memory.")
+        # We need a way to track 'time_period' for in-memory DFs. 
+        # Assuming we wrap them or they have a .name attribute.
+        data_sources = data
+    else:
+        if in_path is None: 
+            in_path = DATA_PATHS[dataset_name]['intermediate']
+        csv_files = list(Path(in_path).glob('*.csv'))
+        if not csv_files:
+            raise FileNotFoundError(f"No CSVs in {in_path}")
+        print(f"Found {len(csv_files)} files for {dataset_name}.")
+        data_sources = csv_files
 
     # whole-survey arrays
     master_full: List[Dict] = []
     master_train: List[Dict] = []
     master_val: List[Dict] = []
     master_test: List[Dict] = []
-    for csv_path in csv_files:
-        pack = process_csv(csv_path, dataset_name, train_plan, debug)
+    for source in data_sources:
+        pack = process_csv(source, dataset_name, train_plan, debug)
         
         if not pack: continue # skip if config missing
         
@@ -112,12 +130,13 @@ def build_steering_dataset(dataset_name: str, train_plan: str = "ideology_to_tru
         master_test.extend(pack.get_data('test'))
 
         if save:
-            output_dir = DATA_PATHS[dataset_name]['processed']
-            output_dir.mkdir(parents=True, exist_ok=True)
+            if out_path is None:
+                out_path = DATA_PATHS[dataset_name]['processed']
+            out_path.mkdir(parents=True, exist_ok=True)
             # e.g. ideology_to_trump_IGS_2024_processed.json
             out_name = f"{train_plan}_{dataset_name}_{pack.time_period}_processed.json"
             
-            with open(output_dir / out_name, 'w') as f:
+            with open(out_path / out_name, 'w') as f:
                 json.dump(full_data, f, indent=2)
             print(f"  Saved {len(full_data)} rows to {out_name}")
 
@@ -126,5 +145,14 @@ def build_steering_dataset(dataset_name: str, train_plan: str = "ideology_to_tru
     master_pack.add_data('train', master_train)
     master_pack.add_data('val', master_val)
     master_pack.add_data('test', master_test)
+
+    if save:
+        out_path = out_path or DATA_PATHS[dataset_name]['processed']
+        out_path.mkdir(parents=True, exist_ok=True)
+        out_name = f"{train_plan}_{dataset_name}_fullpack_processed.json"
+        with open(out_path / out_name, 'w') as f:
+            # Assuming master_pack has a to_dict() method
+            json.dump(master_pack.to_dict(), f, indent=2) 
+        print(f"  Saved combined master pack to {out_name}")
     
     return master_pack

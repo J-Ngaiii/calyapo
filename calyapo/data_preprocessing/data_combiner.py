@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import List, Dict, Any
 
 from calyapo.configurations.data_map_config import TRAIN_PLANS, VARLABEL_DESC
-from calyapo.configurations.config import UNIVERSAL_FINAL_FOLDER, UNIVERSAL_NA_FILLER
+from calyapo.configurations.config import UNIVERSAL_FINAL_FOLDER, UNIVERSAL_NA_FILLER, DATA_PATHS
 from calyapo.data_preprocessing.cleaning_objects import DataPackage, Individual
 from calyapo.data_preprocessing.clean_datasets import build_steering_dataset
 
@@ -85,15 +85,22 @@ def flatten_data_to_llama_format(raw_data_list: List[Dict], split: str) -> List[
             
     return flattened_examples
 
-def save_jsonl(data: List[Dict], filename: str):
-    output_path = UNIVERSAL_FINAL_FOLDER / filename
-    print(f"Saving {len(data)} examples to {output_path}...")
-    with open(output_path, 'w') as f:
+def save_jsonl(data: List[Dict], filename: str, out_path: str = None):
+    if out_path is None:
+        out_path = UNIVERSAL_FINAL_FOLDER / filename
+    print(f"Saving {len(data)} examples to {out_path}...")
+    with open(out_path, 'w') as f:
         for entry in data:
             f.write(json.dumps(entry) + "\n")
 
-def split_combine(train_plan: str, save: bool = True, debug: bool = True):
-    print(f"--- Running Split & Combine for {train_plan} ---")
+def split_combine(train_plan: str, 
+                package: DataPackage = None, 
+                in_path: str = None, 
+                out_path: str = None, 
+                save: bool = True, 
+                debug: bool = False, 
+                verbose: bool = True):
+    if verbose: print(f"--- Running Split & Combine for {train_plan} ---")
     if train_plan not in TRAIN_PLANS:
         raise ValueError(f"Plan {train_plan} not found.")
     
@@ -104,24 +111,40 @@ def split_combine(train_plan: str, save: bool = True, debug: bool = True):
     datasets_in_plan = TRAIN_PLANS[train_plan].get('datasets')
     
     for dataset_name in datasets_in_plan:
-        print(f"Processing {dataset_name}...")
+        if verbose: print(f"Processing {dataset_name}...")
         
-        package: DataPackage = build_steering_dataset(dataset_name, train_plan, save=False, debug=debug) # always set to false to avoid duplicating saving
+        if package is None:
+            # first try inputted path, then pull from config
+            if in_path:
+                processed_dir = in_path
+            else:
+                processed_dir = DATA_PATHS[dataset_name]['processed']    
+            target_json = processed_dir / f"{train_plan}_{dataset_name}_fullpack_processed.json"
+            
+            if target_json.exists():
+                if verbose: print(f"Loading existing package: {target_json.name}")
+                with open(target_json, 'r') as f:
+                    raw_json = json.load(f)
+                    package = DataPackage.from_dict(raw_json) # Reconstruct object
+            else:
+                # if we cannot pull from path generate from scratch
+                if verbose: print(f"No processed data found. Building steering dataset for {dataset_name}...")
+                package = build_steering_dataset(dataset_name, train_plan, save=False, debug=debug)
 
         if debug:
             print(f"Data Package object: {package}")
 
-        train_individuals: List[Dict] = package.get_data('train')
-        val_individuals: List[Dict] = package.get_data('val')
-        test_individuals: List[Dict] = package.get_data('test')
+        train_individuals: List[Dict] = package.get('train')
+        val_individuals: List[Dict] = package.get('val')
+        test_individuals: List[Dict] = package.get('test')
         train_data.extend(flatten_data_to_llama_format(train_individuals, 'train'))
         val_data.extend(flatten_data_to_llama_format(val_individuals, 'val'))
         test_data.extend(flatten_data_to_llama_format(test_individuals, 'test'))
 
     if save:
-        save_jsonl(train_data, f"{train_plan}_train.jsonl")
-        save_jsonl(val_data, f"{train_plan}_val.jsonl")
-        save_jsonl(test_data, f"{train_plan}_test.jsonl")
+        save_jsonl(train_data, f"{train_plan}_train.jsonl", out_path)
+        save_jsonl(val_data, f"{train_plan}_val.jsonl", out_path)
+        save_jsonl(test_data, f"{train_plan}_test.jsonl", out_path)
 
     return {
         "train": train_data,

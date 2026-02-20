@@ -13,6 +13,18 @@ CalyAPO is Jonathan Ngai's Data Science Honors Thesis repository for analyzing C
 # Idea
 - Clean and store steering prompts into jsons (can be done seperately outside of GPU memory)
 
+# Pipeline design
+- The cleaning functions in raw_cleaners.py clean_datasets.py and data_combiner.py are never supposed to interact with the Orchestrator class. The Orchestrator acts upon and manipulates functions in those files. 
+- The cleaning functions in raw_cleaners.py clean_datasets.py and data_combiner.py should not be pulling from paths directly but rather passing data in memory. The Orchestrator class can handle pulling. 
+- The cleaning functions in raw_cleaners.py clean_datasets.py and data_combiner.py need not have rigorous checks. The Individual class handles that. 
+
+# To Do
+- Update IGS Raw with utils file loader
+- Implement CES Raw
+- Handle for pasing configs in the Orchestrator
+- Update combiner to allow for in memory passing
+- Check implementation of build dataset in clean_datasets.py
+
 # repo structure
 \data
 
