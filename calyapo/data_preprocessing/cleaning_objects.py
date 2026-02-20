@@ -18,9 +18,9 @@ class DataPackage:
         :param time_period: Description
         :type time_period: str
         """
-        self.dataset_name = dataset_name
-        self.train_plan = train_plan
-        self.time_period = time_period
+        self.dataset_name = dataset_name # tracked for metadata only
+        self.train_plan = train_plan # tracked for metadata only
+        self.time_period = time_period # tracked for metadata only
         self.data_store = {}
 
     # ----------------------------
@@ -68,6 +68,8 @@ class DataPackage:
     
 class Individual:
     def __init__(self, idx, time_period, train_plan, dataset_name, na_filler = UNIVERSAL_NA_FILLER):
+        if train_plan not in TRAIN_PLANS:
+            raise ValueError(f"Unknown plan: {train_plan}. Check TRAIN_PLANS.")
         if dataset_name not in DATA_PATHS:
             raise ValueError(f"No path defined for {dataset_name} in DATA_PATHS")
         if 'raw' not in DATA_PATHS[dataset_name]:
@@ -80,13 +82,13 @@ class Individual:
         self.id = idx
         self.time_period = time_period
         self.dataset_name = dataset_name
-        self.train_plan = train_plan
+        self.train_plan = train_plan # tracked for metadata only
         self.demog = {}
         self.question_map = {
                             "train" : {
                                 "var_label2qst_text": {}, # we keep track of the variable label (`ideology`), question text and question response
-                                "var_label2qst_choices": {}, 
-                                "var_label2qst_option": {}
+                                "var_label2qst_choices": {}, # choices are what you can choose
+                                "var_label2qst_option": {} # option is what's selected by the respondent
                             }, 
                             "val" : {
                                 "var_label2qst_text": {},
@@ -103,7 +105,7 @@ class Individual:
         self.na_filler = na_filler
         
         # setting up question text and variable mappers NOT invariant across time
-        self.dataset_maps = ALL_DATA_MAPS[dataset_name][time_period]
+        self.dataset_maps = ALL_DATA_MAPS[dataset_name].get(time_period)
         self.label2qes = self.dataset_maps.get('label2qes', {})
         self.label2opt = self.dataset_maps.get('label2opt', {})
         self.var2label = self.dataset_maps.get('var2label', {})
@@ -222,10 +224,11 @@ class Individual:
     # PUBLIC METHODS
     # ---------------
 
-    def add_demog(self, variable_label, raw_val):
+    def add_demog(self, variable_label, raw_val, debug=False):
         decoded = self._process_response(variable_label, raw_val)
-        if variable_label == 'partyid':
-            print(f"decoded val: ", decoded)
+        if debug:
+            if variable_label == 'partyid':
+                print(f"decoded val: ", decoded)
         self.demog[variable_label] = str(decoded)
 
     def add_train(self, variable_label, raw_val):
@@ -237,17 +240,17 @@ class Individual:
     def add_test(self, variable_label, raw_val):
         self._add_question_data('test', variable_label, raw_val)
 
-    def return_split_individual(self, split):
+    def return_split_indiv_map(self, split):
         if split == 'full':
-            return self.return_full_individual()
+            return self.return_full_indiv_map()
         elif split == 'train':
-            return self.return_train_individual()
+            return self.return_train_indiv_map()
         elif split == 'val':
-            return self.return_val_individual()
+            return self.return_val_indiv_map()
         elif split == 'test':
-            return self.return_test_individual()
+            return self.return_test_indiv_map()
 
-    def return_full_individual(self):
+    def return_full_indiv_map(self):
         entry = {
                 "id" : self.id, # default to row index, can use igs id or can just not
                 "time" : self.time_period, 
@@ -259,7 +262,7 @@ class Individual:
             }
         return entry
     
-    def return_train_individual(self):
+    def return_train_indiv_map(self):
         entry = {
                 "id" : self.id, 
                 "time" : self.time_period, 
@@ -269,7 +272,7 @@ class Individual:
             }
         return entry
     
-    def return_val_individual(self):
+    def return_val_indiv_map(self):
         entry = {
                 "id" : self.id, 
                 "time" : self.time_period, 
@@ -279,7 +282,7 @@ class Individual:
             }
         return entry
     
-    def return_test_individual(self):
+    def return_test_indiv_map(self):
         entry = {
                 "id" : self.id, 
                 "time" : self.time_period, 
@@ -294,10 +297,10 @@ class TrainPlanWrapper:
         if train_plan not in TRAIN_PLANS:
             raise ValueError(f"Unknown plan: {train_plan}. Check TRAIN_PLANS.")
         self.plan_config = TRAIN_PLANS[train_plan]
-        self.dataset_name = dataset_name
-        self.train_plan = train_plan
+        self.dataset_name = dataset_name # tracked for metadata only
+        self.train_plan = train_plan # tracked for metadata only
 
-        self.dataset_plan = self.plan_config[dataset_name] # dataset_plan = {'demo' : ['age', 'partyid'], 'train_resp' : ['ideology'], 'val_resp' : ['trump_opinion']}
+        self.variable_map = self.plan_config.get('variable_map') # variable_map = {'demo' : ['age', 'partyid'], 'train_resp' : ['ideology'], 'val_resp' : ['trump_opinion']}
 
     def get_var_lst(self, split: str):
         """
@@ -308,12 +311,12 @@ class TrainPlanWrapper:
         :type split: str
 
         Handles for:
-            demo_vars = self.dataset_plan['demo'] # ['age', 'partyid']
-            train_resp_vars = self.dataset_plan['train_resp'] # ['ideology']
-            val_resp_vars = self.dataset_plan['val_resp'] # ['trump_opinion']
-           test_resp_vars = self.dataset_plan['test_resp'] # ['abortion_senate']
+            demo_vars = self.variable_map['demo'] # ['age', 'partyid']
+            train_resp_vars = self.variable_map['train_resp'] # ['ideology']
+            val_resp_vars = self.variable_map['val_resp'] # ['trump_opinion']
+           test_resp_vars = self.variable_map['test_resp'] # ['abortion_senate']
         """
-        if split not in self.dataset_plan:
+        if split not in self.variable_map:
             raise ValueError(f"Unknown split arg: {split}. Choose from: {self.dataset_plan.keys()}.")
         
-        return self.dataset_plan[split]
+        return self.variable_map[split]

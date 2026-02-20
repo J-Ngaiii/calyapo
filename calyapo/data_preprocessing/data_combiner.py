@@ -3,9 +3,9 @@ import os
 from pathlib import Path
 from typing import List, Dict, Any
 
-from calyapo.configurations.data_map_config import ALL_DATA_MAPS, TRAIN_PLANS
+from calyapo.configurations.data_map_config import TRAIN_PLANS, VARLABEL_DESC
 from calyapo.configurations.config import UNIVERSAL_FINAL_FOLDER, UNIVERSAL_NA_FILLER
-from calyapo.data_preprocessing.cleaning_objects import DataPackage
+from calyapo.data_preprocessing.cleaning_objects import DataPackage, Individual
 from calyapo.data_preprocessing.clean_datasets import build_steering_dataset
 
 UNIVERSAL_FINAL_FOLDER = Path(UNIVERSAL_FINAL_FOLDER)
@@ -16,11 +16,11 @@ def format_demographics(demog_dict: Dict[str, str]) -> str:
     parts = []
     for k, v in demog_dict.items():
         if v == UNIVERSAL_NA_FILLER: continue 
-        clean_key = k.replace('_', ' ').title()
+        clean_key = VARLABEL_DESC[k]
         parts.append(f"{clean_key}: {v}")
     return ", ".join(parts)
 
-def flatten_data_to_llama_format(raw_data_list: List[Dict], section_key: str) -> List[Dict[str, str]]:
+def flatten_data_to_llama_format(raw_data_list: List[Dict], split: str) -> List[Dict[str, str]]:
     """
     Flattens Individuals into MCQ Prompt/Completion pairs.
     """
@@ -35,7 +35,7 @@ def flatten_data_to_llama_format(raw_data_list: List[Dict], section_key: str) ->
         narrative = f"This is a respondent from the {dataset_name} dataset in {time_period}."
         
         # 2. Get Section Data
-        section_data = entry.get(section_key, {})
+        section_data = entry.get(split, {})
         
         # These maps are parallel
         text_map = section_data.get('var_label2qst_text', {})
@@ -47,7 +47,7 @@ def flatten_data_to_llama_format(raw_data_list: List[Dict], section_key: str) ->
         for var_label, answer_data in options_map.items():
             
             # answer_data is a dictionary, e.g. {'option_letter': 'A', 'option_text': 'Yes'}
-            # Note: eval() might be needed if it was saved as string representation of dict
+            # NOTE: eval() might be needed if it was saved as string representation of dict
             if isinstance(answer_data, str):
                 try:
                     import ast
@@ -55,21 +55,22 @@ def flatten_data_to_llama_format(raw_data_list: List[Dict], section_key: str) ->
                 except:
                     continue
 
-            response_text = answer_data.get('option_text')
-            target_letter = answer_data.get('option_letter')
+            response_text = answer_data.get('option_text') # text description of chosen option, accurate to survey
+            target_letter = answer_data.get('option_letter') # just the corresponding letter
             
-            # Skip if missing
+            # skip if missing
             if not target_letter or target_letter == UNIVERSAL_NA_FILLER:
                 continue
                 
             question_text = text_map.get(var_label, "")
             choices_block = choices_map.get(var_label, "")
-            
-            # Construct Prompt
+            question_varlabel_desc = VARLABEL_DESC[var_label]
+
+            # construct P=prompt
             prompt = (
                 f"{narrative}\n"
                 f"Demographics: {demog_str}.\n"
-                f"Question ({var_label}): {question_text}\n"
+                f"Question ({question_varlabel_desc}): {question_text}\n"
                 f"{choices_block}\n"
                 f"Answer:"
             )
@@ -91,7 +92,7 @@ def save_jsonl(data: List[Dict], filename: str):
         for entry in data:
             f.write(json.dumps(entry) + "\n")
 
-def split_combine(train_plan: str, save: bool = True):
+def split_combine(train_plan: str, save: bool = True, debug: bool = True):
     print(f"--- Running Split & Combine for {train_plan} ---")
     if train_plan not in TRAIN_PLANS:
         raise ValueError(f"Plan {train_plan} not found.")
@@ -100,18 +101,22 @@ def split_combine(train_plan: str, save: bool = True):
     val_data = []
     test_data = []
     
-    datasets_in_plan = TRAIN_PLANS[train_plan].keys()
+    datasets_in_plan = TRAIN_PLANS[train_plan].get('datasets')
     
     for dataset_name in datasets_in_plan:
         print(f"Processing {dataset_name}...")
         
-        # Get Package (Runs cleaning)
-        package: DataPackage = build_steering_dataset(dataset_name, train_plan, save=True)
+        package: DataPackage = build_steering_dataset(dataset_name, train_plan, save=False, debug=debug) # always set to false to avoid duplicating saving
 
-        # Flatten
-        train_data.extend(flatten_data_to_llama_format(package.get_data('train'), 'train'))
-        val_data.extend(flatten_data_to_llama_format(package.get_data('val'), 'val'))
-        test_data.extend(flatten_data_to_llama_format(package.get_data('test'), 'test'))
+        if debug:
+            print(f"Data Package object: {package}")
+
+        train_individuals: List[Dict] = package.get_data('train')
+        val_individuals: List[Dict] = package.get_data('val')
+        test_individuals: List[Dict] = package.get_data('test')
+        train_data.extend(flatten_data_to_llama_format(train_individuals, 'train'))
+        val_data.extend(flatten_data_to_llama_format(val_individuals, 'val'))
+        test_data.extend(flatten_data_to_llama_format(test_individuals, 'test'))
 
     if save:
         save_jsonl(train_data, f"{train_plan}_train.jsonl")
@@ -123,6 +128,3 @@ def split_combine(train_plan: str, save: bool = True):
         "val": val_data,
         "test": test_data
     }
-
-if __name__ == "__main__":
-    split_combine('ideology_to_trump')
