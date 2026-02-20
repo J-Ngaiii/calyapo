@@ -43,10 +43,12 @@ TRAIN_PLANS = {
     'ideology_to_ideology' : 
         {
             'variable_map': IDEO_IDEO, 
-            'datasets' : set(['IGS'])
+            'datasets' : set(['IGS']), 
+            'question_split_variation' : None # we can do ideo to ideo but have the question wording change
         }, 
     'ideology_to_trump' : {
             'variable_map': IDEO_TRUMP, 
-            'datasets' : set(['IGS'])
+            'datasets' : set(['IGS']), 
+            'question_split_variation' : None
         }
 }
