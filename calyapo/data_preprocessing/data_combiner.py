@@ -7,6 +7,7 @@ from calyapo.configurations.data_map_config import TRAIN_PLANS, VARLABEL_DESC
 from calyapo.configurations.config import UNIVERSAL_FINAL_FOLDER, UNIVERSAL_NA_FILLER, DATA_PATHS
 from calyapo.data_preprocessing.cleaning_objects import DataPackage, Individual
 from calyapo.data_preprocessing.clean_datasets import build_steering_dataset
+from calyapo.utils.persistence import *
 
 UNIVERSAL_FINAL_FOLDER = Path(UNIVERSAL_FINAL_FOLDER)
 UNIVERSAL_FINAL_FOLDER.mkdir(parents=True, exist_ok=True)
@@ -93,7 +94,8 @@ def save_jsonl(data: List[Dict], filename: str, out_path: str = None):
         for entry in data:
             f.write(json.dumps(entry) + "\n")
 
-def split_combine(train_plan: str, 
+def split_combine(
+                train_plan: str, 
                 package: DataPackage = None, 
                 in_path: str = None, 
                 out_path: str = None, 
@@ -123,13 +125,12 @@ def split_combine(train_plan: str,
             
             if target_json.exists():
                 if verbose: print(f"Loading existing package: {target_json.name}")
-                with open(target_json, 'r') as f:
-                    raw_json = json.load(f)
-                    package = DataPackage.from_dict(raw_json) # Reconstruct object
+                raw_json = file_loader(in_path=target_json, data_type='json', verbose=verbose)
+                package = DataPackage.from_dict(raw_json) 
             else:
                 # if we cannot pull from path generate from scratch
                 if verbose: print(f"No processed data found. Building steering dataset for {dataset_name}...")
-                package = build_steering_dataset(dataset_name, train_plan, save=False, debug=debug)
+                package = build_steering_dataset(dataset_name=dataset_name, train_plan=train_plan, save=False, debug=debug)
 
         if debug:
             print(f"Data Package object: {package}")
@@ -151,3 +152,6 @@ def split_combine(train_plan: str,
         "val": val_data,
         "test": test_data
     }
+
+def split_ratio():
+    pass

@@ -4,6 +4,7 @@ import string
 import json
 from pathlib import Path
 import pandas as pd
+from collections import defaultdict
 
 from calyapo.configurations.data_map_config import ALL_DATA_MAPS, TRAIN_PLANS
 from calyapo.configurations.config import DATA_PATHS, UNIVERSAL_NA_FILLER
@@ -72,21 +73,7 @@ class Orchestrator:
         return file_loader(in_path=in_path, data_type=data_type, verbose=verbose)
         
     def _data_saver(self, data: Any, out_path: Path, data_type: str, verbose: bool = False):
-        """
-        Saves data to files based on type. 
-        """
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-                
-        if isinstance(data, pd.DataFrame):
-            data.to_csv(out_path, index=False)
-        elif isinstance(data, (list, dict)):
-            with open(out_path, 'w') as f:
-                json.dump(data, f, indent=4)
-        elif hasattr(data, 'to_dict'):
-            with open(out_path, 'w') as f:
-                json.dump(data.to_dict(), f, indent=4)
-        
-        if verbose: print(f"  [SUCCESS] Results saved to: {out_path}")
+        file_saver(out_path=out_path, data=data, data_type=data_type, verbose=verbose)
         
     def execute(self, verbose: bool = False):
         if verbose: print(f"--- Starting Orchestration: {self.metadata.get('plan_desc', 'Unknown Orchestration Plan')} ---")
@@ -97,8 +84,9 @@ class Orchestrator:
             if config.get('in_path'):
                 curr_data = self._data_extracter(Path(config['in_path']), config.get('in_type', 'csv'), verbose)
                 
+            counter = 1
             for func, params in zip(config['functions'], config['params']):
-                if verbose: print(f"  > Executing: {func.__name__} (In-Memory: {config.get('in_memory', True)})")
+                if verbose: print(f"|>>({counter})>>| Executing: {func.__name__} (In-Memory: {config.get('in_memory', True)})")
                 
                 if config.get('in_memory', True):
                     # standard flow: pass the object directly
@@ -108,11 +96,13 @@ class Orchestrator:
                     curr_data = self._data_extracter(in_path, config.get('in_type', 'csv'), verbose)
                     curr_data = func(curr_data, **params)
 
+                counter += 1
+
             if config.get('save_results'):
                 out_path = Path(config['out_path'])
                 self._data_saver(curr_data, out_path, config.get('out_type', 'csv'), verbose)
             else:
-                if verbose: print("  > Stage complete. Results passed in-memory.")
+                if verbose: print(f"|:D| Stage complete. Results passed in-memory.")
                 
         self.cleaned_data = curr_data
         print("\n--- Orchestration Complete ---")
@@ -459,9 +449,49 @@ class TrainPlanWrapper:
             demo_vars = self.variable_map['demo'] # ['age', 'partyid']
             train_resp_vars = self.variable_map['train_resp'] # ['ideology']
             val_resp_vars = self.variable_map['val_resp'] # ['trump_opinion']
-           test_resp_vars = self.variable_map['test_resp'] # ['abortion_senate']
+            test_resp_vars = self.variable_map['test_resp'] # ['abortion_senate']
         """
         if split not in self.variable_map:
             raise ValueError(f"Unknown split arg: {split}. Choose from: {self.dataset_plan.keys()}.")
         
         return self.variable_map[split]
+    
+class DataSpliter:
+    """
+    Splits data into train, test, val based on idx. Combines data from different datasets.
+
+    build_steering splits on question, data spliter splits on individuals
+    """
+    def __init__(self, train_plan: str, train_ratio: float = None, val_ratio: float = None, test_ratio: float = None):
+        self.plan_config = TRAIN_PLANS[train_plan]
+        self.variable_map = self.plan_config['variable_map']
+        self.homogenous_plan = self.plan_config['homogenous_var_plan']
+        self.ques_split_varying = self.plan_config['question_varies_by_split']
+        self.datasets = self.plan_config['datasets']
+        
+        self.train_ratio = train_ratio
+        self.val_ratio = val_ratio
+        self.test_ratio = test_ratio
+
+    def split_package(self, package: DataPackage):
+        # need to assess what happens id theres a missing value, are they excluded? 
+        
+        if self.homogenous_plan and self.ques_split_varying:
+            # if you are train, val, testing on the exact same question => exact same variable label
+            full_indiv_maps = package['full']
+            indiv_ids = [indiv['id'] for indiv in full_indiv_maps]
+
+            # 2. Vectorized assignment of buckets
+            distribution = [self.train_ratio, self.val_ratio, self.test_ratio]
+            indices = np.random.choice(['train', 'val', 'test'], size=len(indiv_ids), p=distribution)
+
+            # 3. Populate buckets without shadowing variables
+            buckets = defaultdict(list)
+            for indiv_id, bucket in zip(indiv_ids, indices):
+                buckets[bucket].append(indiv_id)
+        else:
+            # see which set has the least data points --> check if that is less than the respective ratios
+            # if num data points in min set is less than its ratio (eg we have less val datapoints than what we should have for val_ratio = 0.2)
+            # then just run it but do a print
+            # else trim it down
+            pass
