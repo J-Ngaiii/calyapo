@@ -1,5 +1,5 @@
 import argparse
-from calyapo.data_preprocessing.data_combiner import split_combine
+from calyapo.data_preprocessing.funcs.data_combiner import split_combine
 
 def main():
     parser = argparse.ArgumentParser(description="Takes in cleaned json data and generates train, val , tests splits in <prompt:completion> format for finetuning")

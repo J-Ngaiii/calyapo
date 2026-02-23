@@ -1,5 +1,5 @@
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 import string
 import json
 from pathlib import Path
@@ -9,121 +9,27 @@ from collections import defaultdict
 from calyapo.configurations.data_map_config import ALL_DATA_MAPS, TRAIN_PLANS
 from calyapo.configurations.config import DATA_PATHS, UNIVERSAL_NA_FILLER
 from calyapo.utils.persistence import *
-
-class Orchestrator:
-    def __init__(self, dataset_name: str, orchestration_plan: Dict):
-        """
-        Takes a orechestration_plan dict:
-        {
-            'num_stages' : 4, 
-            'modules' : {
-                mod1 : {
-                    'functions' : [func_a, func_b], 
-                    'params' : [param_dict_a, param_dict_b], 
-                    'in_path' : "specify", 
-                    'in_types' : [csv, sav], 
-                    'out_path' : "specify", 
-                    'out_type' : "json", 
-                    'save_results' : False, 
-                }, 
-                mod2 : {
-                    'desc' : 'Generating cleaned dataset', 
-                    'functions' : [func_c, func_d], 
-                    'params' : [param_dict_c, param_dict_d], 
-                    'in_path' : "specify", 
-                    'in_types' : [csv, sav], 
-                    'out_path' : "specify", 
-                    'out_type' : "json", 
-                    'save_results' : False, 
-                }
-            }, 
-            'orchestrator_metadata' : {
-                plan_desc : "Calyapo version 0.2 standard orchestration plan", 
-            }
-        }
-        """
-        self.dataset_name = dataset_name
-        self.num_stages = orchestration_plan['num_stages']
-        self.modules = orchestration_plan['modules']
-        self.metadata = orchestration_plan['plan_metadata']
-        self.cleaned_data = self._generate_metadata(self.modules)
-
-    def _generate_metadata(self, modules_dict):
-        outline = []
-        for mod, cfg in modules_dict.items():
-            funcs_str = ", ".join([f"{f.__name__}({p})" for f, p in zip(cfg['functions'], cfg['params'])])
-            outline.append(f"Module {mod} calls: {funcs_str}")
-        
-        self.metadata['plan_outline'] = " | ".join(outline)
-
-    def print_metadata(self):
-        """Prints a clean, formatted summary of the orchestration plan."""
-        print(f"\n------ CALYAPO ORCHESTRATOR: {self.dataset_name} ------ ")
-        
-        print(f"{'Description:':<15} {self.metadata.get('plan_desc', 'N/A')}")
-        print(f"{'Total Stages:':<15} {self.num_stages}")
-        
-        print("\nEXECUTION PIPELINE:")
-        print("-" * 20)
-        
-        for step in self.metadata.get('plan_outline', []):
-            print(f" • {step}")
-
-    def _data_extracter(self, in_path: Path, data_type: str, verbose: bool = False):
-        return file_loader(in_path=in_path, data_type=data_type, verbose=verbose)
-        
-    def _data_saver(self, data: Any, out_path: Path, data_type: str, verbose: bool = False):
-        file_saver(out_path=out_path, data=data, data_type=data_type, verbose=verbose)
-        
-    def execute(self, verbose: bool = False):
-        if verbose: print(f"--- Starting Orchestration: {self.metadata.get('plan_desc', 'Unknown Orchestration Plan')} ---")
-        
-        curr_data = None
-        for mod_name, config in self.modules.items():
-            if verbose: print(f"\n[Stage: {mod_name}]")
-            if config.get('in_path'):
-                curr_data = self._data_extracter(Path(config['in_path']), config.get('in_type', 'csv'), verbose)
-                
-            counter = 1
-            for func, params in zip(config['functions'], config['params']):
-                if verbose: print(f"|>>({counter})>>| Executing: {func.__name__} (In-Memory: {config.get('in_memory', True)})")
-                
-                if config.get('in_memory', True):
-                    # standard flow: pass the object directly
-                    curr_data, configs = func(curr_data, **params)
-                else:
-                    in_path = Path(config.get('in_path')) 
-                    curr_data = self._data_extracter(in_path, config.get('in_type', 'csv'), verbose)
-                    curr_data = func(curr_data, **params)
-
-                counter += 1
-
-            if config.get('save_results'):
-                out_path = Path(config['out_path'])
-                self._data_saver(curr_data, out_path, config.get('out_type', 'csv'), verbose)
-            else:
-                if verbose: print(f"|:D| Stage complete. Results passed in-memory.")
-                
-        self.cleaned_data = curr_data
-        print("\n--- Orchestration Complete ---")
             
-
 class DataPackage:
-    def __init__(self, dataset_name: str, train_plan: str, time_period: str):
+    def __init__(
+            self, 
+            dataset_name: str, 
+            train_plan: str = None, 
+            time_period: Union[List[str] | str] = None, 
+            assembly_func: str = None, 
+            destination_func: str = None
+        ):
         """
         DataPackage is a hashmap/dictionary wrapper that allows us to track metadata for debugging.
-        
-        :param self: Description
-        :param dataset_name: Description
-        :type dataset_name: str
-        :param train_plan: Description
-        :type train_plan: str
-        :param time_period: Description
-        :type time_period: str
+        Also allows for passing information between functions besides just directly passing their inputs/outputs. 
         """
-        self.dataset_name = dataset_name # tracked for metadata only
-        self.train_plan = train_plan # tracked for metadata only
-        self.time_period = time_period # tracked for metadata only
+        self.meta = {
+            'dataset_name' : dataset_name, 
+            'train_plan' : train_plan, 
+            'time_period' : time_period, 
+            'assembly_function' : assembly_func, 
+            'destination_function' : destination_func
+        }
         self.data_store = {}
 
     # ----------------------------
@@ -146,19 +52,36 @@ class DataPackage:
         """Nice string representation for debugging"""
         return f"<DataPackage: {self.dataset_name} ({self.time_period}) keys={list(self.data_store.keys())}>"
     
-    def to_dict(self) -> dict:
+    def to_dict(self, debug: bool = False) -> dict:
         """
         Flattens metadata and data_store into a single dictionary.
         
         NOTE: If a key in data_store matches a metadata field name, 
         the data_store value will overwrite the metadata.
         """
-        return {
-            "dataset_name": self.dataset_name,
-            "train_plan": self.train_plan,
-            "time_period": self.time_period,
+        out = {
+            **self.meta, 
             **self.data_store  # unpacks all key-value pairs 
         }
+
+        if debug:
+            print(f"(DataPackage.to_dict() | Debug) meta present: '{all([k in out.keys() for k in self.meta.keys()])}'; data present: '{all([k in out.keys() for k in self.data_store.keys()])}'")
+        return out
+    
+    @property
+    def get_meta(self, field):
+        return self.meta.get(field)
+    @property
+    def dataset_name(self):
+        return self.meta.get('dataset_name')
+
+    @property
+    def time_period(self):
+        return self.meta.get('time_period')
+    
+    @property
+    def train_plan(self):
+        return self.meta.get('train_plan')
     
     @classmethod
     def from_dict(cls, data: dict) -> 'DataPackage':
@@ -179,7 +102,6 @@ class DataPackage:
         return instance
 
     def get(self, key: str, default=None) -> Any:
-        """Safe retrieval: package.get('missing', None)"""
         return self.data_store.get(key, default)
 
     def keys(self):
@@ -301,7 +223,9 @@ class Individual:
                 return self.opt_decoders[variable_label][raw_int]
         except ValueError:
             pass
-
+        
+        # in the case of nan vals, all previous checks fail
+        # then the na_filler is returned and filled in
         return self.na_filler
     
     def _get_choices_string(self, variable_label: str, raw_val: str) -> str:
@@ -362,8 +286,7 @@ class Individual:
     def add_demog(self, variable_label, raw_val, debug=False):
         decoded = self._process_response(variable_label, raw_val)
         if debug:
-            if variable_label == 'partyid':
-                print(f"decoded val: ", decoded)
+            pass
         self.demog[variable_label] = str(decoded)
 
     def add_train(self, variable_label, raw_val):
@@ -439,12 +362,6 @@ class TrainPlanWrapper:
 
     def get_var_lst(self, split: str):
         """
-        Docstring for get_var_lst
-        
-        :param self: Description
-        :param split: Description
-        :type split: str
-
         Handles for:
             demo_vars = self.variable_map['demo'] # ['age', 'partyid']
             train_resp_vars = self.variable_map['train_resp'] # ['ideology']
@@ -455,43 +372,3 @@ class TrainPlanWrapper:
             raise ValueError(f"Unknown split arg: {split}. Choose from: {self.dataset_plan.keys()}.")
         
         return self.variable_map[split]
-    
-class DataSpliter:
-    """
-    Splits data into train, test, val based on idx. Combines data from different datasets.
-
-    build_steering splits on question, data spliter splits on individuals
-    """
-    def __init__(self, train_plan: str, train_ratio: float = None, val_ratio: float = None, test_ratio: float = None):
-        self.plan_config = TRAIN_PLANS[train_plan]
-        self.variable_map = self.plan_config['variable_map']
-        self.homogenous_plan = self.plan_config['homogenous_var_plan']
-        self.ques_split_varying = self.plan_config['question_varies_by_split']
-        self.datasets = self.plan_config['datasets']
-        
-        self.train_ratio = train_ratio
-        self.val_ratio = val_ratio
-        self.test_ratio = test_ratio
-
-    def split_package(self, package: DataPackage):
-        # need to assess what happens id theres a missing value, are they excluded? 
-        
-        if self.homogenous_plan and self.ques_split_varying:
-            # if you are train, val, testing on the exact same question => exact same variable label
-            full_indiv_maps = package['full']
-            indiv_ids = [indiv['id'] for indiv in full_indiv_maps]
-
-            # 2. Vectorized assignment of buckets
-            distribution = [self.train_ratio, self.val_ratio, self.test_ratio]
-            indices = np.random.choice(['train', 'val', 'test'], size=len(indiv_ids), p=distribution)
-
-            # 3. Populate buckets without shadowing variables
-            buckets = defaultdict(list)
-            for indiv_id, bucket in zip(indiv_ids, indices):
-                buckets[bucket].append(indiv_id)
-        else:
-            # see which set has the least data points --> check if that is less than the respective ratios
-            # if num data points in min set is less than its ratio (eg we have less val datapoints than what we should have for val_ratio = 0.2)
-            # then just run it but do a print
-            # else trim it down
-            pass
