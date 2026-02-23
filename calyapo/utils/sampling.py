@@ -38,13 +38,40 @@ class ReservoirSample:
         elif sample == 'out_sample':
             return self.out_sample
         
-def _num_unique_individuals(value_buckets: Iterable[Iterable]):
+def _num_unique_individuals(value_buckets: Iterable[Iterable], debug: bool = False):
+    # unify
     unique_pool = set()
     for b in value_buckets:
         for item in b:
-            uid = item.get('id') if isinstance(item, dict) else item
+            if 'uniqueid' in item:
+                if debug: print(f"(num_unique_individuals | Debug) Grabbing 'uniqueids' ")
+                uid = item.get('uniqueid')
+            else:
+                if debug: print(f"(num_unique_individuals | Debug) Grabbing normal 'ids' ")
+                uid = item.get('id')
             unique_pool.add(uid)
     return len(unique_pool), unique_pool
+
+# def assign_to_eligible_bucket(val_id, eligibility_map, current_val):
+#         eligible_for = eligibility_map[val_id]
+        
+#         # We can only pick buckets that are:
+#         # A) Not the target bucket (already handled)
+#         # B) The individual actually exists in (has valid data for)
+#         potential_targets = [b for b in remaining_buckets if b in eligible_for]
+        
+#         if not potential_targets:
+#             if debug: print(f"Warning: ID {val_id} has no valid alternative buckets. Skipping.")
+#             return
+
+#         # Re-normalize distribution for the specific valid targets for this person
+#         # e.g. if they only fit in 'Train', p becomes [1.0]
+#         specific_probs = [bucket_distrib[b] for b in potential_targets]
+#         norm_probs = [p / sum(specific_probs) for p in specific_probs]
+        
+#         chosen_idx = np.random.choice(potential_targets, p=norm_probs)
+#         output_buckets[chosen_idx].append(current_val)
+#         consumed_ids.add(val_id)
         
 def exhaustive_hierarchal_sample(value_buckets: Iterable[Iterable[Dict]], targ_bucket_idx: int, bucket_distrib: Iterable, silent_handle: bool = False, debug: bool = False):
     assert targ_bucket_idx < len(bucket_distrib), f"Target bucket idx '{targ_bucket_idx}' exceeds number of buckets given distribution '{len(bucket_distrib)}'"
@@ -77,7 +104,10 @@ def exhaustive_hierarchal_sample(value_buckets: Iterable[Iterable[Dict]], targ_b
 
     output_buckets = [[] for _ in range(len(value_buckets))]
     output_buckets[targ_bucket_idx] = sampler.get(sample='reservoir')
-    consumed_ids = set([indiv_map.get('id') for indiv_map in output_buckets[targ_bucket_idx]])
+    consumed_ids = set([
+        indiv_map.get('uniqueid') if 'uniqueid' in indiv_map else indiv_map.get('id') 
+        for indiv_map in output_buckets[targ_bucket_idx]
+    ])
 
     remaining_distribution = [prob / (1 - bucket_distrib[targ_bucket_idx]) for i, prob in enumerate(bucket_distrib) if i != targ_bucket_idx]
     remaining_buckets = [i for i in range(len(value_buckets)) if i != targ_bucket_idx]
@@ -89,7 +119,10 @@ def exhaustive_hierarchal_sample(value_buckets: Iterable[Iterable[Dict]], targ_b
         
     # sweep through out sample 
     for val in sampler.get(sample='out_sample'):
-        val_id = val.get('id')
+        if 'uniqueid' in val:
+            val_id = val.get('uniqueid')
+        else:
+            val_id = val.get('id')
         if val_id in consumed_ids:
             continue
 
@@ -104,8 +137,7 @@ def exhaustive_hierarchal_sample(value_buckets: Iterable[Iterable[Dict]], targ_b
             print(f"Index '{i}'; length '{len(output_buckets[i])}'")
 
     # sweep thru everyone else
-    for indiv_map in global_id_pool:
-        val_id = indiv_map.get('id')
+    for val_id in global_id_pool:
         if val_id not in consumed_ids:
             # need to assign individual to a split they're actually eligible for not just random choice it
             bucket_idx = np.random.choice(remaining_buckets, p=remaining_distribution)
