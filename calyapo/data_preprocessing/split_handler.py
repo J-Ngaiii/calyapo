@@ -100,36 +100,38 @@ class SplitHandler:
 
         return out_pack
     
+    def precombiner(self, save: bool = False, debug: bool = False, verbose: bool = False):
+        """
+        Must read from path because it needs to wait for all datasets to finish their split_ratio calls.
+        """
+        # default path pull
+        penult_dir = UNIVERSAL_PENULTIMATE_FOLDER
+        outPack = DataPackage(dataset_name='multiple, combing', train_plan=self.train_plan, time_period='multiple, combining')
+        outPack['dataset_packages'] = {} # maps dataset_name : split_ratio out pack
+        for dataset_name in self.plan_config['datasets']:
+            target_json = penult_dir / f"{self.train_plan}_{dataset_name}_fullsplit.json"
+            
+            if target_json.exists():
+                raw_json = file_loader(in_path=target_json, data_type='json', verbose=verbose)
+                package = DataPackage.from_dict(raw_json) 
+                if verbose: print(f"(Split Handler | Pre-Combining) pulled data for '{dataset_name}' from path")
+            else:
+                # if we cannot pull from path generate from scratch
+                package = self.split_on_questions(dataset_name=dataset_name, train_plan=self.train_plan, save=save, debug=debug, verbose=verbose)
+                if verbose: print(f"(Split Handler | Pre-Combining) No processed data found in paths. Built package for '{dataset_name}' from scratch")
+            outPack['dataset_packages'][dataset_name] = package
+        return outPack
+            
+    
     def combine_datasets(self, package: DataPackage = None, dataset_name: str = None, save: bool = False, debug: bool = False, verbose: bool = False):
         """
         Combines splitted up data into one massive dataset.
         Does drop NaN values. 
         Handles for automatic file path checking if package is none.
         """
-        def valid_combine_pack(package, verbose: bool = False):
-
-            for field in set(['train', 'val', 'test']):
-                if field not in package:
-                    if verbose: f"(Split Handler | Combining) field {field} missing from inputted package {package}"
-                    return False
-            return True
-
-        if package is None or valid_combine_pack(package, verbose):
-            # default path pull
-            processed_dir = DATA_PATHS[dataset_name]['processed']    
-            target_json = processed_dir / f"{self.train_plan}_{dataset_name}_fullpack_processed.json"
-            
-            if target_json.exists():
-                if verbose: print(f"(Split Handler | Combining) Loading existing package: {target_json.name}")
-                raw_json = file_loader(in_path=target_json, data_type='json', verbose=verbose)
-                package = DataPackage.from_dict(raw_json) 
-            else:
-                # if we cannot pull from path generate from scratch
-                if verbose: print(f"(Split Handler | Combining) No processed data found. Building steering dataset for {dataset_name}...")
-                package = self._split_on_questions(dataset_name=dataset_name, train_plan=self.train_plan, save=save, debug=debug, verbose=verbose)
-        else:
-            if verbose: print(f"(Split Handler | Combining) Processing {len(package['full'])} json-ized individuals passed in-memory.")
-
+        if package is None or package['dataset_packages'] is None:
+            if verbose: print(f"(Split Handler) no package passed in memory, calling SplitHandler precombiner")
+            package = self.precombiner(save, debug, verbose)
         out_path = UNIVERSAL_FINAL_FOLDER
         out_dict = split_combine(package=package, out_path=out_path, save=save, debug=debug, verbose=verbose)      
         return out_dict

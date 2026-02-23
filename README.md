@@ -2,16 +2,8 @@
 
 CalyAPO is Jonathan Ngai's Data Science Honors Thesis repository for analyzing California public opinion data and training neural net models.
 
-# Steps
-- load raw data including as jsons
-- define a your_dataset.py file in the training/datasets folder than tells the repo how to load your data
-- modify training/datasets/__init__.py so that the dictionary handles for the new dataset you added AND update configs/datasets.py
-- in dataset_utils define the data collator, loader and getter 
-- modify train_utils.py in training/utils with relevant config and different modes
-- modify the finetuning.py script
-
 # Idea
-- Clean and store steering prompts into jsons (can be done seperately outside of GPU memory)
+- If we split each dataset into train/val/test based on predefined ratios then comebine them back together the whole thing => the overall ratios will be preserved for the combined dataset and each split will have a proportionate number of individuals from each dataset
 
 # Pipeline design
 - The cleaning functions in raw_cleaners.py clean_datasets.py and data_combiner.py are never supposed to interact with the Orchestrator class. The Orchestrator acts upon and manipulates functions in those files. 
