@@ -51,6 +51,6 @@ TRAIN_PLANS = {
             'variable_map': IDEO_TRUMP, 
             'homogenous_var_plan' : False, 
             'datasets' : set(['IGS']), 
-            'question_split_variation' : True # of course will be true
+            'question_varies_by_split' : True # of course will be true
         }
 }

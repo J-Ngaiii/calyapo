@@ -8,10 +8,11 @@ from calyapo.configurations.config import DATA_PATHS, UNIVERSAL_NA_FILLER
 from calyapo.data_preprocessing.cleaning_objects import Individual, TrainPlanWrapper, DataPackage
 from calyapo.utils.persistence import *
 
-def process_csv(data: pd.Dataframe, dataset_name: str, train_plan: str, debug: bool = False, verbose: bool = False) -> DataPackage:
+def process_csv(data: pd.DataFrame, dataset_name: str, train_plan: str, debug: bool = False, verbose: bool = False) -> DataPackage:
     """
     Process a single CSV file or dataframe and return a DataPackage.
     """
+
     if 'time_period' in data.columns:
         # previous functions should create this col for in-memory processing
         time_period = str(data['time_period'].iloc[0])
@@ -19,10 +20,10 @@ def process_csv(data: pd.Dataframe, dataset_name: str, train_plan: str, debug: b
         time_period = UNIVERSAL_NA_FILLER
 
     if time_period not in ALL_DATA_MAPS.get(dataset_name, {}):
-        if verbose: print(f"No mapping for {dataset_name} in {time_period}. Skipping.")
+        if verbose: print(f"(process__csv) No mapping for '{dataset_name}' in '{time_period}'. Skipping.")
         return None
 
-    if debug: print(f"Base df:\n{data}")
+    if debug: print(f"(process_csv | Debug) Base df empty: '{data is None}'")
     
     tp_wrap = TrainPlanWrapper(dataset_name, train_plan) # validates train_plan and dataset_name
     dataset_maps = ALL_DATA_MAPS[dataset_name][time_period]
@@ -35,13 +36,13 @@ def process_csv(data: pd.Dataframe, dataset_name: str, train_plan: str, debug: b
     val_data: List[Dict] = []
     test_data: List[Dict] = []
     for idx, row in data.iterrows():
-        # ID Logic
+        # ID logic
         id_col = label2var.get('dataset_id')
         indiv_id = row[id_col] if (id_col and id_col in row) else idx
         
         entry = Individual(indiv_id, time_period, train_plan, dataset_name)
 
-        # 1. Demographics
+        # 1. demographics
         for var_label in tp_wrap.get_var_lst('demo'):
             csv_col = label2var.get(var_label)
             if csv_col and csv_col in row:
@@ -49,19 +50,21 @@ def process_csv(data: pd.Dataframe, dataset_name: str, train_plan: str, debug: b
             else:
                 entry.add_demog(var_label, UNIVERSAL_NA_FILLER, debug)
 
-        # 2. Train Questions
+        # 2. train questions
         for var_label in tp_wrap.get_var_lst('train_resp'):
             csv_col = label2var.get(var_label)
             if csv_col and csv_col in row:
+                # activates if given theres an nan value
                 entry.add_train(var_label, row[csv_col])
+                
 
-        # 3. Val Questions
+        # 3. val questions
         for var_label in tp_wrap.get_var_lst('val_resp'):
             csv_col = label2var.get(var_label)
             if csv_col and csv_col in row:
                 entry.add_val(var_label, row[csv_col])
         
-        # 4. Test Questions
+        # 4. test questions
         for var_label in tp_wrap.get_var_lst('test_resp'):
             csv_col = label2var.get(var_label)
             if csv_col and csv_col in row:
@@ -72,70 +75,61 @@ def process_csv(data: pd.Dataframe, dataset_name: str, train_plan: str, debug: b
         val_data.append(entry.return_split_indiv_map('val'))
         test_data.append(entry.return_split_indiv_map('test'))
 
-    pack = DataPackage(dataset_name, train_plan, time_period)
+    # all are the same length due to missing val handling in Individual class
+    pack = DataPackage(
+        dataset_name=dataset_name, 
+        train_plan=train_plan, 
+        time_period=time_period,
+    )
     pack.add_data('full', cleaned_data)
     pack.add_data('train', train_data)
     pack.add_data('val', val_data)
     pack.add_data('test', test_data)
+
+    if debug:
+        print(pack)
     
     return pack
 
 
-def build_steering_dataset(
-        data_or_path: Union[List[pd.DataFrame]|Path|str], 
+def split_questions(
+        data: List[pd.DataFrame], 
         dataset_name: str, 
-        train_plan: str = "ideology_to_trump", 
+        train_plan: str, 
         out_path: str = None, 
         save: bool = True, 
         debug: bool = False, 
-        verbose: bool = False):
+        verbose: bool = False
+    ) -> DataPackage:
     """
     Iterates through all CSVs for a dataset, cleans them, saves intermediates,
     and returns a combined DataPackage.
-    """
-    if isinstance(data_or_path, list) and all([isinstance(df, pd.DataFrame) for df in data_or_path]):
-        if verbose: print(f"Processing {len(data_or_path)} DataFrames passed in-memory.")
-        data_sources = data_or_path
-    else:
-        if data_or_path is None: # use default path if no given path
-            data_or_path = DATA_PATHS[dataset_name]['intermediate']
-        data_sources = list(Path(data_or_path).glob('*.csv'))
-        if not data_sources:
-            raise FileNotFoundError(f"No CSVs in {data_or_path}")
-        if verbose: print(f"Found {len(data_sources)} files for {dataset_name}.")
-
+    """    
     # whole-survey arrays
     master_full: List[Dict] = []
     master_train: List[Dict] = []
     master_val: List[Dict] = []
     master_test: List[Dict] = []
-    for source in data_sources:
-        # use file loader then make process csv just handle data
-        # time period is baked into dataframe / csv anyway
-        if isinstance(source, Path) or isinstance(source, str):
-            data = file_loader(in_path=source, data_type='csv', verbose=verbose) # fixed to csv, any type conversion happens at raw layer
-        else:
-            data = source
-        pack = process_csv(data=data, dataset_name=dataset_name, train_plan=train_plan, debug=debug, verbose=verbose)
+    for df in data:
+        pack = process_csv(data=df, dataset_name=dataset_name, train_plan=train_plan, debug=debug, verbose=verbose)
+
         
         if not pack: continue # skip if config missing
         
         full_data = pack.get_data('full')
+        if debug:
+            print(f"(split_question | Debug) full_data empty:{full_data is None}")
         master_full.extend(full_data)
         master_train.extend(pack.get_data('train'))
         master_val.extend(pack.get_data('val'))
         master_test.extend(pack.get_data('test'))
 
         if save:
-            if out_path is None:
-                out_path = DATA_PATHS[dataset_name]['processed']
-            out_path.mkdir(parents=True, exist_ok=True)
+            assert out_path is not None, f"(split_questions) Cannot save files without valid out path"
             # e.g. ideology_to_trump_IGS_2024_processed.json
             out_name = f"{train_plan}_{dataset_name}_{pack.time_period}_processed.json"
             
-            with open(out_path / out_name, 'w') as f:
-                json.dump(full_data, f, indent=2)
-            if verbose: print(f"Saved {len(full_data)} rows to {out_name}")
+            file_saver(out_path=Path(out_path / out_name), data=full_data, data_type='DataPackage', indnt=2, verbose=verbose)
 
     master_pack = DataPackage(dataset_name, train_plan, "all_combined")
     master_pack.add_data('full', master_full)
@@ -143,12 +137,12 @@ def build_steering_dataset(
     master_pack.add_data('val', master_val)
     master_pack.add_data('test', master_test)
 
+    if debug:
+        print(f"(split_question | Debug) master_pack['full'] empty: {master_pack.get('full') is None}")
+
     if save:
-        out_path = out_path or DATA_PATHS[dataset_name]['processed']
-        out_path.mkdir(parents=True, exist_ok=True)
+        assert out_path is not None, f"(split_questions) Cannot save files without valid out path"
         out_name = f"{train_plan}_{dataset_name}_fullpack_processed.json"
-        with open(out_path / out_name, 'w') as f:
-            json.dump(master_pack.to_dict(), f, indent=2) 
-        if verbose: print(f"Saved master data package for {dataset_name} to {out_name}")
+        file_saver(out_path=Path(out_path / out_name), data=master_pack, data_type='DataPackage', indnt=2, verbose=verbose)
     
     return master_pack

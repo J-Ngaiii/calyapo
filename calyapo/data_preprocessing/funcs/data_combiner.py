@@ -4,9 +4,8 @@ from pathlib import Path
 from typing import List, Dict, Any
 
 from calyapo.configurations.data_map_config import TRAIN_PLANS, VARLABEL_DESC
-from calyapo.configurations.config import UNIVERSAL_FINAL_FOLDER, UNIVERSAL_NA_FILLER, DATA_PATHS
+from calyapo.configurations.config import UNIVERSAL_FINAL_FOLDER, UNIVERSAL_NA_FILLER
 from calyapo.data_preprocessing.cleaning_objects import DataPackage, Individual
-from calyapo.data_preprocessing.clean_datasets import build_steering_dataset
 from calyapo.utils.persistence import *
 
 UNIVERSAL_FINAL_FOLDER = Path(UNIVERSAL_FINAL_FOLDER)
@@ -95,13 +94,15 @@ def save_jsonl(data: List[Dict], filename: str, out_path: str = None):
             f.write(json.dumps(entry) + "\n")
 
 def split_combine(
-                train_plan: str, 
-                package: DataPackage = None, 
-                in_path: str = None, 
-                out_path: str = None, 
-                save: bool = True, 
-                debug: bool = False, 
-                verbose: bool = True):
+        package: DataPackage, 
+        out_path: str = None, 
+        save: bool = True, 
+        debug: bool = False, 
+        verbose: bool = True
+    ):
+    
+    train_plan = package.train_plan
+    
     if verbose: print(f"--- Running Split & Combine for {train_plan} ---")
     if train_plan not in TRAIN_PLANS:
         raise ValueError(f"Plan {train_plan} not found.")
@@ -114,35 +115,18 @@ def split_combine(
     
     for dataset_name in datasets_in_plan:
         if verbose: print(f"Processing {dataset_name}...")
-        
-        if package is None:
-            # first try inputted path, then pull from config
-            if in_path:
-                processed_dir = in_path
-            else:
-                processed_dir = DATA_PATHS[dataset_name]['processed']    
-            target_json = processed_dir / f"{train_plan}_{dataset_name}_fullpack_processed.json"
-            
-            if target_json.exists():
-                if verbose: print(f"Loading existing package: {target_json.name}")
-                raw_json = file_loader(in_path=target_json, data_type='json', verbose=verbose)
-                package = DataPackage.from_dict(raw_json) 
-            else:
-                # if we cannot pull from path generate from scratch
-                if verbose: print(f"No processed data found. Building steering dataset for {dataset_name}...")
-                package = build_steering_dataset(dataset_name=dataset_name, train_plan=train_plan, save=False, debug=debug)
-
         if debug:
-            print(f"Data Package object: {package}")
+            print(f"Data Package: {package}")
 
-        train_individuals: List[Dict] = package.get('train')
-        val_individuals: List[Dict] = package.get('val')
-        test_individuals: List[Dict] = package.get('test')
-        train_data.extend(flatten_data_to_llama_format(train_individuals, 'train'))
-        val_data.extend(flatten_data_to_llama_format(val_individuals, 'val'))
-        test_data.extend(flatten_data_to_llama_format(test_individuals, 'test'))
+        train_indiv_maps: List[Dict] = package.get('train')
+        val_indiv_maps: List[Dict] = package.get('val')
+        test_indiv_maps: List[Dict] = package.get('test')
+        train_data.extend(flatten_data_to_llama_format(train_indiv_maps, 'train'))
+        val_data.extend(flatten_data_to_llama_format(val_indiv_maps, 'val'))
+        test_data.extend(flatten_data_to_llama_format(test_indiv_maps, 'test'))
 
     if save:
+        assert out_path is not None, f"(split_combine) Cannot have no out_path if saving."
         save_jsonl(train_data, f"{train_plan}_train.jsonl", out_path)
         save_jsonl(val_data, f"{train_plan}_val.jsonl", out_path)
         save_jsonl(test_data, f"{train_plan}_test.jsonl", out_path)
@@ -153,5 +137,3 @@ def split_combine(
         "test": test_data
     }
 
-def split_ratio():
-    pass

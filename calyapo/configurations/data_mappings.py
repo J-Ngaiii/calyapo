@@ -18,7 +18,7 @@ IGS_VAR_TO_LABEL_24 = {
     'SEX' : 'sex', 
     'Q22' : 'gender', 
     'Q23' : 'education', 
-    'Q24_combined' : 'race', 
+    'racial_id' : 'race', 
     'URBANICITY' : 'env_urban'
 }
 
@@ -36,6 +36,15 @@ IGS_LABEL_TO_OPT_24 = {
         'Republican' : "4", 
         'No Party Preference' : "2", 
         'Other Party' : "3"
+    }, 
+    'race' : {
+        'White': "1", 
+        'Black/African American' : "2",
+        'Hispanic/Latino' : "3",
+        'Asian/Asian American' : "4",
+        'Native American/Alaska Native' : "5",
+        'Native Hawaiian/Pacific Islander' : "6",
+        'Other' : "7"
     }, 
     'sex' : {
         'Female' : "1", 

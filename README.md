@@ -17,6 +17,13 @@ CalyAPO is Jonathan Ngai's Data Science Honors Thesis repository for analyzing C
 - The cleaning functions in raw_cleaners.py clean_datasets.py and data_combiner.py are never supposed to interact with the Orchestrator class. The Orchestrator acts upon and manipulates functions in those files. 
 - The cleaning functions in raw_cleaners.py clean_datasets.py and data_combiner.py should not be pulling from paths directly but rather passing data in memory. The Orchestrator class can handle pulling. 
 - The cleaning functions in raw_cleaners.py clean_datasets.py and data_combiner.py need not have rigorous checks. The Individual class handles that. 
+- The cleaning functions in raw_cleaners.py clean_datasets.py and data_combiner.py get imported into DataSplitter that creates the train, val and tests splits end to end.
+- skipping missing data happens in split_combine's llama flatten helper
+
+**overall hierarchy**
+- Individual cleaning functions execute operations on a per df batch basis
+- Handler funcs handle file pulling and in-memory data passing
+- Orchestrator string inputs/outputs from diff handlers together
 
 # To Do
 - Update IGS Raw with utils file loader
