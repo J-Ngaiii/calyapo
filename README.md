@@ -26,11 +26,7 @@ CalyAPO is Jonathan Ngai's Data Science Honors Thesis repository for analyzing C
 - Orchestrator string inputs/outputs from diff handlers together
 
 # To Do
-- Update IGS Raw with utils file loader
-- Implement CES Raw
-- Handle for pasing configs in the Orchestrator
-- Update combiner to allow for in memory passing
-- Check implementation of build dataset in clean_datasets.py
+- uniqieID for training on multiple questions so the samplers dont need to de-duplicate
 
 # repo structure
 \data

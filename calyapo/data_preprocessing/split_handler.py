@@ -96,6 +96,8 @@ class SplitHandler:
             verbose=verbose
         )
 
+        split_ratio_validator(out_pack, verbose)
+
         return out_pack
     
     def combine_datasets(self, package: DataPackage = None, dataset_name: str = None, save: bool = False, debug: bool = False, verbose: bool = False):
