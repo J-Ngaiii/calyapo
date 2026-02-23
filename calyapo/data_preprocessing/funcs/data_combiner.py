@@ -85,10 +85,12 @@ def flatten_data_to_llama_format(raw_data_list: List[Dict], split: str) -> List[
             
     return flattened_examples
 
-def save_jsonl(data: List[Dict], filename: str, out_path: str = None):
+def save_jsonl(data: List[Dict], filename: str, out_path: str = None, verbose: bool = False):
     if out_path is None:
-        out_path = UNIVERSAL_FINAL_FOLDER / filename
-    print(f"Saving {len(data)} examples to {out_path}...")
+        out_path = Path(UNIVERSAL_FINAL_FOLDER) / filename
+    elif Path(out_path).is_dir():
+        out_path = Path(out_path) / filename
+    if verbose: print(f"(split_combine | save_jsonl) Saving {len(data)} examples to {out_path}...")
     with open(out_path, 'w') as f:
         for entry in data:
             f.write(json.dumps(entry) + "\n")
@@ -100,36 +102,30 @@ def split_combine(
         debug: bool = False, 
         verbose: bool = True
     ):
-    
-    train_plan = package.train_plan
-    
-    if verbose: print(f"--- Running Split & Combine for {train_plan} ---")
-    if train_plan not in TRAIN_PLANS:
-        raise ValueError(f"Plan {train_plan} not found.")
-    
     train_data = []
     val_data = []
     test_data = []
-    
-    datasets_in_plan = TRAIN_PLANS[train_plan].get('datasets')
-    
-    for dataset_name in datasets_in_plan:
-        if verbose: print(f"Processing {dataset_name}...")
+        
+    # needs to be able to take different packages in memory
+    if verbose:
+        print(f"(split_combine) There are '{len(package['dataset_packages'])}' datasets to process")
+    for dataset_name, inpack in package['dataset_packages'].items():
+        if verbose: print(f"(split_combine) Processing {dataset_name}...")
         if debug:
-            print(f"Data Package: {package}")
+            print(f"(split_combine | Debug) Data Package: {package}")
 
-        train_indiv_maps: List[Dict] = package.get('train')
-        val_indiv_maps: List[Dict] = package.get('val')
-        test_indiv_maps: List[Dict] = package.get('test')
+        train_indiv_maps: List[Dict] = inpack.get('train')
+        val_indiv_maps: List[Dict] = inpack.get('val')
+        test_indiv_maps: List[Dict] = inpack.get('test')
         train_data.extend(flatten_data_to_llama_format(train_indiv_maps, 'train'))
         val_data.extend(flatten_data_to_llama_format(val_indiv_maps, 'val'))
         test_data.extend(flatten_data_to_llama_format(test_indiv_maps, 'test'))
 
     if save:
-        assert out_path is not None, f"(split_combine) Cannot have no out_path if saving."
-        save_jsonl(train_data, f"{train_plan}_train.jsonl", out_path)
-        save_jsonl(val_data, f"{train_plan}_val.jsonl", out_path)
-        save_jsonl(test_data, f"{train_plan}_test.jsonl", out_path)
+        assert out_path is not None, f"(split_combine | WARNING) Cannot have no out_path if saving."
+        save_jsonl(train_data, f"{package.train_plan}_train.jsonl", out_path, verbose)
+        save_jsonl(val_data, f"{package.train_plan}_val.jsonl", out_path, verbose)
+        save_jsonl(test_data, f"{package.train_plan}_test.jsonl", out_path, verbose)
 
     return {
         "train": train_data,

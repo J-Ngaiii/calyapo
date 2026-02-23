@@ -12,12 +12,34 @@ from calyapo.utils.persistence import *
 random.seed(UNIVERSAL_RANDOM_SEED)
 
 def get_unique_id(indiv_map: Dict):
-    if 'uniquieid' in indiv_map:
+    if 'uniqueid' in indiv_map:
         id = indiv_map.get('uniqueid')
     else:
         id = indiv_map.get('id')
 
     return id
+
+def indiv_valid_response(indiv_map: Dict, splt: str, check: str = 'all'):
+    option_map = indiv_map[splt].get('var_label2qst_option', {})
+    
+    if check == 'all':
+        # need to iterate thru all the label : option_dict values
+        # option_map = {
+        #   'ideology' : {'option_letter' : 'A', 'option_text' : 'XYZ'}, 'trump' : {'option_letter' : 'B', 'option_text' : 'shdsah'}
+        # }
+        has_data = all(
+            # responses to all questions not NaN
+            opt.get('option_letter') != UNIVERSAL_NA_FILLER 
+            for opt in option_map.values()
+        ) # training plans with multiple train/val/test questions we want ALL questions to be not NA to include
+    elif check == 'any':
+        has_data = any(
+            # any response to a question not NaN
+            opt.get('option_letter') != UNIVERSAL_NA_FILLER 
+            for opt in option_map.values()
+        )
+
+    return has_data
 
 def split_ratio(
         package: DataPackage, 
@@ -60,15 +82,8 @@ def split_ratio(
             if id in seen:
                 continue
 
-            option_map = indiv_map['train'].get('var_label2qst_option', {})
             # doesn't matter which split, all the questions will be the same
-                
-            has_data = all(
-                opt.get('option_letter') != UNIVERSAL_NA_FILLER 
-                for opt in option_map.values()
-            ) # training plans with multiple train/val/test questions we want ALL questions to be not NA to include
-            
-            if has_data:
+            if indiv_valid_response(indiv_map=indiv_map, splt='train', check='all'):
                 all_valid_indivs.append(indiv_map)
 
         if debug:
@@ -99,15 +114,8 @@ def split_ratio(
             valid_indivs = [] # assemble all the individual ids
             for indiv_map in package[spl]:
                 indiv_map: Dict
-                option_map = indiv_map[spl].get('var_label2qst_option', {})
-                
-                has_data = all(
-                    opt.get('option_letter') != UNIVERSAL_NA_FILLER 
-                    for opt in option_map.values()
-                ) # training plans with multiple train/val/test questions we want ALL questions to be not NA to include
-                
-                if has_data:
-                    valid_indivs.append(indiv_map)
+                if indiv_valid_response(indiv_map=indiv_map, splt=spl, check='all'):
+                    all_valid_indivs.append(indiv_map)
             
             splits[i] = valid_indivs
 
@@ -127,7 +135,8 @@ def split_ratio(
     if save:
         assert out_path is not None, f"(split_ratio) Cannot save if out_path not specified"
         file_name = f"{package.train_plan}_{package.dataset_name}_fullsplit.json"
-        file_saver(out_path=Path(out_path / file_name), data=outPack, data_type='DataPackage', indnt=2, verbose=verbose)
+        full_path = Path(out_path) / file_name
+        file_saver(out_path=full_path, data=outPack, data_type='DataPackage', indnt=2, verbose=verbose)
 
     return outPack
 
@@ -150,6 +159,8 @@ def split_ratio_validator(pack: DataPackage, verbose: bool = False):
         for indiv_map in pack[splt]:
             indiv_id = get_unique_id(indiv_map)
             id_registry[indiv_id].append(splt)
+            if not indiv_valid_response(indiv_map, splt, 'all'):
+                id_registry[indiv_id].append(f"{splt}-contains NaN")
 
     leaks = {
         idx: appearances 
