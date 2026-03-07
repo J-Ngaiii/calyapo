@@ -24,6 +24,7 @@ class SplitHandler:
         self.plan_config = TRAIN_PLANS[train_plan]
         self.variable_map = self.plan_config['variable_map']
         self.homogenous_plan = self.plan_config['homogenous_var_plan']
+        self.train_setting = self.plan_config['train_setting']
         self.ques_split_varying = self.plan_config['question_varies_by_split']
         self.datasets = self.plan_config['datasets']
         
@@ -90,6 +91,7 @@ class SplitHandler:
             target_ratios=self.training_ratios, 
             homogenous_plan=self.homogenous_plan, 
             ques_split_varying=self.ques_split_varying, 
+            train_setting=self.train_setting, 
             out_path=out_path, 
             save=save, 
             debug=debug, 
@@ -123,7 +125,7 @@ class SplitHandler:
         return outPack
             
     
-    def combine_datasets(self, package: DataPackage = None, dataset_name: str = None, save: bool = False, debug: bool = False, verbose: bool = False):
+    def combine_datasets(self, package: DataPackage = None, save: bool = False, debug: bool = False, verbose: bool = False):
         """
         Combines splitted up data into one massive dataset.
         Does drop NaN values. 
@@ -133,5 +135,5 @@ class SplitHandler:
             if verbose: print(f"(Split Handler) no package passed in memory, calling SplitHandler precombiner")
             package = self.precombiner(save, debug, verbose)
         out_path = UNIVERSAL_FINAL_FOLDER
-        out_dict = split_combine(package=package, out_path=out_path, save=save, debug=debug, verbose=verbose)      
+        out_dict = split_combine(package=package, out_path=out_path, save=save, debug=debug, verbose=verbose)       
         return out_dict

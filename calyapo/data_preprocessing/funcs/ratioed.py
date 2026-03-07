@@ -46,6 +46,7 @@ def split_ratio(
         target_ratios: Dict[str, float], 
         homogenous_plan: bool, 
         ques_split_varying: bool,
+        train_setting: int, 
         out_path: str = None, 
         save: bool = False, 
         debug: bool = False, 
@@ -56,7 +57,7 @@ def split_ratio(
     In the case of validating on multiple questions => don't want model to learn to predict "no response"
     => only select individuals who responded to ALL questions into the validation set. 
 
-    Output must put it each unique value into a particular split (train/val/test) with no overlaps.
+    Output must put it each unique value into a particular split (train/val/test) with no overlaps in Train Settings 1 and 2
     """
     if debug:
             test = (
@@ -68,9 +69,9 @@ def split_ratio(
             )
             print(f"Length of all splits equal: '{test}'")
             
-    if homogenous_plan and not ques_split_varying:
+    if homogenous_plan and not ques_split_varying or train_setting == 1:
         if debug:
-            print(f"(split_ratio| Debug) Homogenous question processing active")
+            print(f"(split_ratio| Debug) Train Setting 1: Same question, new individual processing active")
         # if you are train, val, testing on the exact same question => exact same variable label
 
         # remove individuals without a valid response
@@ -100,6 +101,28 @@ def split_ratio(
         outPack['train'] = [all_valid_indivs[i] for i in indices[:train_end]]
         outPack['val'] = [all_valid_indivs[i] for i in indices[train_end:val_end]]
         outPack['test'] = [all_valid_indivs[i] for i in indices[val_end:]]
+    elif train_setting == 2:
+        if debug:
+            print(f"(split_ratio| Debug) Train Setting 2: New question, same individual processing active")
+
+        train_valid_indivs = []
+        val_valid_indivs = []
+        test_valid_indivs = []
+        for indiv_map in package['full']:
+            if indiv_valid_response(indiv_map=indiv_map, splt='train', check='all'):
+                train_valid_indivs.append(indiv_map)
+            if indiv_valid_response(indiv_map=indiv_map, splt='val', check='all'):
+                val_valid_indivs.append(indiv_map)
+            if indiv_valid_response(indiv_map=indiv_map, splt='val', check='all'):
+                test_valid_indivs.append(indiv_map)
+
+        if debug:
+            print(f"(split_ratio| Debug) num train individuals: '{len(train_valid_indivs)}'\n(split_ratio| Debug) num val individuals: '{len(val_valid_indivs)}'\n(split_ratio| Debug) num val individuals: '{len(test_valid_indivs)}'")
+        
+        outPack = DataPackage(package.dataset_name, package.train_plan, package.time_period)
+        outPack['train'] = train_valid_indivs
+        outPack['val'] = val_valid_indivs
+        outPack['test'] = test_valid_indivs
     else:
         # see which split set has the least data points --> check if that is less than the respective ratios
         # if num data points in split set with the least data points is less than its ratio (eg we have less val datapoints than what we should have for val_ratio = 0.2)
@@ -107,6 +130,9 @@ def split_ratio(
         # else trim it down
 
         # counting valid individuals
+
+        if debug:
+            print(f"(split_ratio| Debug) Train Setting 3: New question, new individual processing active")
         sets = ['train', 'val', 'test']
         splits: List[Dict] = [0] * 3
         for i in range(len(sets)):

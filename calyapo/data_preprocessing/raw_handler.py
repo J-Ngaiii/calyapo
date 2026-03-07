@@ -32,7 +32,7 @@ class RawHandler:
             out_path = DATA_PATHS[dataset_name]['intermediate']
 
         end_of_str_time_pat = '_([^_]+).csv'
-        data, time_periods = file_loader(in_path=in_path, data_type='csv', path_extract=end_of_str_time_pat, always_return_lst=True, debug=debug, verbose=verbose)
+        data, time_periods = file_loader(in_path=in_path, data_type=['csv', 'dta'], path_extract=end_of_str_time_pat, always_return_lst=True, debug=debug, verbose=verbose)
         inpack = DataPackage(
             dataset_name=dataset_name, 
             train_plan='N/A, this is a raw cleaning inpack', 

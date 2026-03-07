@@ -3,13 +3,42 @@ import pandas as pd
 import re
 import json
 from pathlib import Path
-from typing import Any, List, Tuple
+from typing import Any, List, Tuple, Iterable, Union, Callable
 from calyapo.data_preprocessing.cleaning_objects import DataPackage
+
+LOADERS: dict[str, Callable[[Path], Any]] = {
+    'csv': pd.read_csv,
+    'dta': pd.read_stata,
+    'json': lambda p: json.loads(p.read_text()),
+    'DataPackage': lambda p: DataPackage.from_dict(json.loads(p.read_text()))
+}
+
+def _try_load(file_path: Path, dtype: str) -> Any:
+    """Loads file or returns none."""
+    loader = LOADERS.get(dtype)
+    if not loader:
+        return None
+    try:
+        return loader(file_path)
+    except Exception:
+        return None
+
+def _file_load_helper(file_path, data_type: Iterable):
+    data = None
+    for dtype in data_type:
+        if data is None:
+            data = _try_load(file_path=file_path, dtype=dtype)
+        else:
+            break
+    if data is None:
+        print(f"(file_loader) No file with datatypes `{data_type}` found under path `{file_path}` ")
+    return data
+
 
 def file_loader(
             in_path: Path, 
             data_type: str, 
-            path_extract: str = None, 
+            path_extract: Union[str|Iterable] = None, 
             always_return_lst: bool = False, 
             debug: bool = False, 
             verbose: bool = False
@@ -24,6 +53,9 @@ def file_loader(
         if isinstance(in_path, str):
             in_path = Path(in_path)
 
+        if isinstance(data_type, str):
+            data_type = [data_type]
+
         if in_path.is_dir():
             if verbose: print(f"(File Loader) Scanning directory for *.{data_type} files...")
             target_files = list(in_path.glob(f"*.{data_type}"))
@@ -35,14 +67,7 @@ def file_loader(
         for file_path in target_files:
             if verbose: print(f"(File Loader) Loading {file_path.name}...")
             
-            if data_type == 'csv':
-                data.append(pd.read_csv(file_path))
-            elif data_type == 'json':
-                with open(file_path, 'r') as f:
-                    data.append(json.load(f))
-            elif data_type == 'DataPackage':
-                 with open(file_path, 'r') as f:
-                    data.append(DataPackage.from_dict(json.load(f)))
+            data.append(_file_load_helper(file_path=file_path, data_type=data_type))
 
             if path_extract is not None:
                 if debug:
