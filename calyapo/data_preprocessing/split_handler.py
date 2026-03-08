@@ -57,12 +57,13 @@ class SplitHandler:
             if verbose: print(f"(Split Handler | Splitting) Found {len(all_in_paths)} files for {dataset_name}.")
         else:
             # use data passed in-memory
-            interim_data = package['data']
+            interim_data: List[pd.DataFrame] = package['data']
             dataset_name = package.dataset_name
             if verbose: print(f"(Split Handler | Splitting) Processing {len(interim_data)} DataFrames passed in-memory.")
         
         out_path = DATA_PATHS[dataset_name]['processed']
         out_pack = split_questions(data=interim_data, dataset_name=dataset_name, train_plan=self.train_plan, out_path=out_path, save=save, debug=debug, verbose=verbose)
+        # split on questions compiles data from all time periods per dataset
         # train plan is written onto out_pack
         return out_pack
     
@@ -71,7 +72,7 @@ class SplitHandler:
         Splits data based on ratio. 
         Connects to RawHandler's clean_dataset.
         """
-        if package is None or package['data'] is None:
+        if package is None or package['full'] is None:
             # default path pull
             processed_dir = DATA_PATHS[dataset_name]['processed']    
             target_json = processed_dir / f"{self.train_plan}_{dataset_name}_fullpack_processed.json"
@@ -83,8 +84,11 @@ class SplitHandler:
             else:
                 # if we cannot pull from path generate from scratch
                 if verbose: print(f"(Split Handler | Ratioing) No processed data found. Building steering dataset for {dataset_name}...")
-                package = self._split_on_questions(dataset_name=dataset_name, train_plan=self.train_plan, save=save, debug=debug, verbose=verbose)
-        
+                package = self.split_on_questions(dataset_name=dataset_name, train_plan=self.train_plan, save=save, debug=debug, verbose=verbose)
+        else:
+            data: List[pd.DataFrame] = package['full']
+            if verbose: print(f"(Split Handler | Ratioing) Processing {len(data)} individual maps passed in-memory.")
+
         out_path = UNIVERSAL_PENULTIMATE_FOLDER
         out_pack = split_ratio(
             package=package, 
@@ -98,13 +102,16 @@ class SplitHandler:
             verbose=verbose
         )
 
-        split_ratio_validator(out_pack, verbose)
+        if self.train_setting == 1 or self.train_setting == 3:
+            split_ratio_validator(out_pack, verbose)
+        else:
+            if verbose: print(f"(Split Handler | Ratioing) On training setting {self.train_setting}, validator inactive")
 
         return out_pack
     
     def precombiner(self, save: bool = False, debug: bool = False, verbose: bool = False):
         """
-        Must read from path because it needs to wait for all datasets to finish their split_ratio calls.
+        Must read from path because it needs to wait for all datasets to finish their split_ratio calls combining by time period and splitting into train/val/test
         """
         # default path pull
         penult_dir = UNIVERSAL_PENULTIMATE_FOLDER

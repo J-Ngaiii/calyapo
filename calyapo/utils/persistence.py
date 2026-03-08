@@ -13,21 +13,25 @@ LOADERS: dict[str, Callable[[Path], Any]] = {
     'DataPackage': lambda p: DataPackage.from_dict(json.loads(p.read_text()))
 }
 
-def _try_load(file_path: Path, dtype: str) -> Any:
+def _try_load(file_path: Path, dtype: str, debug: str = False, verbose: str = False) -> Any:
     """Loads file or returns none."""
     loader = LOADERS.get(dtype)
     if not loader:
+        if verbose or debug: 
+            print(f"(try_load) Loader '{loader}' for datatype '{dtype}' not found for file path '{file_path}'")
         return None
     try:
+        if verbose: 
+            print(f"(try_load) Loader '{loader}' for datatype '{dtype}' active for file path '{file_path}'")
         return loader(file_path)
     except Exception:
         return None
 
-def _file_load_helper(file_path, data_type: Iterable):
+def _file_load_helper(file_path, data_type: Iterable, debug: str = False, verbose: str = False):
     data = None
     for dtype in data_type:
         if data is None:
-            data = _try_load(file_path=file_path, dtype=dtype)
+            data = _try_load(file_path=file_path, dtype=dtype, debug=debug, verbose=verbose)
         else:
             break
     if data is None:
@@ -57,8 +61,11 @@ def file_loader(
             data_type = [data_type]
 
         if in_path.is_dir():
-            if verbose: print(f"(File Loader) Scanning directory for *.{data_type} files...")
-            target_files = list(in_path.glob(f"*.{data_type}"))
+            if verbose: print(f"(File Loader) Scanning directory for {data_type} files...")
+            target_files = []
+            for dtype in data_type: 
+                files = list(in_path.glob(f"*.{dtype}"))
+                target_files.extend(files)
         else:
             target_files = [in_path]
 
@@ -67,7 +74,7 @@ def file_loader(
         for file_path in target_files:
             if verbose: print(f"(File Loader) Loading {file_path.name}...")
             
-            data.append(_file_load_helper(file_path=file_path, data_type=data_type))
+            data.append(_file_load_helper(file_path=file_path, data_type=data_type, debug=debug, verbose=verbose))
 
             if path_extract is not None:
                 if debug:
@@ -81,9 +88,9 @@ def file_loader(
                     if verbose: print(f"(File Loader) could not find regex match via pattern {path_extract}")
 
         if data == []:
-            raise ValueError(f"(File Loader) inputted path {in_path} legitimate but no files loaded from path")
+            raise ValueError(f"(File Loader) inputted path '{in_path}' legitimate but no files loaded from path")
         if path_extractions == [] and path_extract is not None:
-            raise ValueError(f"(File Loader) inputted path {in_path} legitimate but no match via pattern {path_extract} found")
+            raise ValueError(f"(File Loader) inputted path '{in_path}' legitimate but no match via pattern '{path_extract}' found")
         
         if path_extract is not None:
             if len(data) > 1 or always_return_lst:

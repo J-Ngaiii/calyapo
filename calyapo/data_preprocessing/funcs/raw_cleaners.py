@@ -19,7 +19,7 @@ def IGS_raw_clean(
     vectorized lists of DFs (e.g., from a directory load).
     """
     
-    data = dataPackage['data']
+    data = dataPackage['data'] # list of dataframes for different time periods
     time_periods = dataPackage['time_periods']
 
     if debug:
