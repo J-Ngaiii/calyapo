@@ -25,6 +25,7 @@ class SplitHandler:
         self.variable_map = self.plan_config['variable_map']
         self.homogenous_plan = self.plan_config['homogenous_var_plan']
         self.train_setting = self.plan_config['train_setting']
+        self.valid_indiv_setting = self.plan_config.get('valid_indiv_setting', None)
         self.ques_split_varying = self.plan_config['question_varies_by_split']
         self.datasets = self.plan_config['datasets']
         
@@ -96,6 +97,7 @@ class SplitHandler:
             homogenous_plan=self.homogenous_plan, 
             ques_split_varying=self.ques_split_varying, 
             train_setting=self.train_setting, 
+            valid_indiv_setting=self.valid_indiv_setting,
             out_path=out_path, 
             save=save, 
             debug=debug, 

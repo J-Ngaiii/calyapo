@@ -11,13 +11,17 @@ VARLABEL_DESC = {
     'dataset_id': 'Respondent ID',
     'ideology': 'Political Ideology',
     'trump_opinion': 'Trump Favorability',
-    'abortion_senate': 'Politician Abortion Stance',
+    'oppose_abortion_senate': 'Importance of Senatorial Candidate Opposing Abortion Rights',
+    'defend_abortion_senate': 'Importance of Senatorial Candidate Defending Abortion Rights',
     'prop1_2024': 'California Proposition 1',
     'sex': 'Biological Sex',
     'gender': 'Gender Identity',
     'education': 'Highest Education Level',
     'race': 'Race',
-    'env_urban': 'Residence Urbanicity'
+    'env_urban': 'Residence Urbanicity', 
+    'marital' : 'Marital Status', 
+    'oppose_immigration_senate' : 'Importance of Senatorial Candidate Immigration Toughness',
+    'biden_opinion' : 'Biden Favorability',
 }
 
 # IGS finetuning variable maps
@@ -29,11 +33,19 @@ IDEO_IDEO = {
 }
 
 IDEO_TRUMP =  {
-    'demo' : ['age', 'partyid', 'gender', 'sex', 'env_urban'], 
+    'demo' : ['age', 'partyid', 'gender', 'sex', 'education',  'env_urban', 'race', 'marital'], 
     'train_resp' : ['ideology'], 
     'val_resp' : ['trump_opinion'], 
-    'test_resp' : ['abortion_senate']
+    'test_resp' : ['trump_opinion']
 }
+
+PREZ_ABORTION =  {
+    'demo' : ['age', 'partyid', 'ideology', 'race', 'gender', 'sex', 'env_urban', 'marital'], 
+    'train_resp' : ['trump_opinion', 'biden_opinion'], 
+    'val_resp' : ['oppose_abortion_senate', 'defend_abortion_senate'], 
+    'test_resp' : ['oppose_abortion_senate', 'defend_abortion_senate']
+} # simulate low information voter that doesn't have policy stances
+
 
 # all plans
 TRAIN_PLANS = {
@@ -54,5 +66,13 @@ TRAIN_PLANS = {
             'datasets' : set(['IGS']), 
             'question_varies_by_split' : True, # of course will be true
             'train_setting' : 2
+        }, 
+    'presidents_to_abortion' : {
+            'variable_map': PREZ_ABORTION, 
+            'homogenous_var_plan' : False, 
+            'datasets' : set(['IGS']), 
+            'question_varies_by_split' : True, # of course will be true
+            'train_setting' : 2, 
+            'valid_indiv_setting' : 'any'
         }
 }

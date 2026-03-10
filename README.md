@@ -17,6 +17,13 @@ CalyAPO is Jonathan Ngai's Data Science Honors Thesis repository for analyzing C
 - Handler funcs handle file pulling and in-memory data passing
 - Orchestrator string inputs/outputs from diff handlers together
 
+# Stages of data
+- Raw (csv or dta or sav): Completely unprocessed
+- Intermediate (csv): Processed by raw_cleaners, all columns are readable by configs to be mapped to variable_labels like 'harris_opinion'
+- Processed (json): json form of each dataset-time period combination, basically a list of dictionaries with each dictionary corresponding to an individual with the train/val/test questions and responses and demographics per indiv_map
+- penultimate (json): compile all jsons from /processed directory based on dataset across time period
+- final (json): contains the actual steering : completion formatted jsons
+
 # To Do
 - uniqieID for training on multiple questions so the samplers dont need to de-duplicate
 

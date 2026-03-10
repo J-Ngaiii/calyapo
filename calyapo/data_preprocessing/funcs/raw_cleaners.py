@@ -3,7 +3,7 @@ import numpy as np
 from typing import List, Union
 from pathlib import Path
 
-from calyapo.configurations.config import DATA_PATHS, UNIVERSAL_NA_FILLER
+from calyapo.configurations.config import IGS_RACE_MAP, UNIVERSAL_NA_FILLER
 from calyapo.data_preprocessing.cleaning_objects import DataPackage
 from calyapo.utils.persistence import *
 
@@ -23,7 +23,7 @@ def IGS_raw_clean(
     time_periods = dataPackage['time_periods']
 
     if debug:
-        print(f"(IGS_raw | Debug) Data <type '{type(data)}'>:{data}\n(IGS_raw | Debug) Time Periods <type '{type(time_periods)}'>:{time_periods}")
+        print(f"(IGS_raw | Debug) Data First 5 Vals [type '{type(data)}', shape '{len(data)}'] {data[:5]}'\n(IGS_raw | Debug) Time Periods: [type '{type(time_periods)}']:{time_periods}")
 
     output = []
     for df, period in zip(data, time_periods):
@@ -47,21 +47,16 @@ def _process_single_df(df: pd.DataFrame, period: str, debug: bool = False) -> pd
     if 'time_period' not in df.columns:
         df['time_period'] = period
 
-    RACE_MAP = {
-        'Q24_1': '1',
-        'Q24_2': '2',
-        'Q24_3': '3',
-        'Q24_4': '4',
-        'Q24_5': '5',
-        'Q24_6': '6',
-        'Q24_7': '7'
-    }
+    if period not in IGS_RACE_MAP:
+        raise ValueError(f"Inputted period '{period}' not in race map")
+    RACE_MAP = IGS_RACE_MAP[period]
 
     present_race_cols = [col for col in RACE_MAP.keys() if col in df.columns]
     if present_race_cols:
         encodings = np.array([RACE_MAP[col] for col in present_race_cols])
         matrix = (
             df[present_race_cols]
+            .astype(object)
             .replace(r'^\s*$', np.nan, regex=True) # replaces empty or whitespace strings
             .fillna(0)
             .astype(int)

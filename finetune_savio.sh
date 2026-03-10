@@ -41,8 +41,9 @@ fi
 # --- Define Training Parameters ---
 # Joseph's SubPOP version: https://github.com/JosephJeesungSuh/subpop/tree/main
 # Llama Cookbook version: https://github.com/meta-llama/llama-cookbook/tree/main/getting-started/finetuning
-export HF_TOKEN=""
-export WANDB_API_KEY=""
+if [ -f .env ]; then # store API keys in a local .env file then search for the variables
+  export $(grep -v '^#' .env | xargs)
+fi
 export TOKENIZERS_PARALLELISM=false # for debugging we wanna just use one gpu with batch size 1
 
 # Distributed Setup
@@ -50,17 +51,23 @@ NPROC_PER_NODE=1                      # Match this to your --gres=gpu count
 MASTER_PORT=$(expr 10000 + $(echo -n $SLURM_JOBID | tail -c 4)) # Random port to avoid collisions
 
 # Model/Data Params
-DATASET="ideology_to_trump_dataset"
+DATASET="ideology_to_ideology"
 MODEL_NAME="meta-llama/Llama-2-7b-hf"
 OUTPUT_DIR="calyapo/training/checkpoints/${DATASET}"
-USE_PEFT=False
+USE_PEFT=True
 BATCH_SIZE_TRAINING=1
 BATCH_SIZE_VALIDATION=1
 GRADIENT_ACCUMULATION_STEPS=4
-DIST_CHECKPOINT_ROOT_FOLDER="/global/scratch/users/jonathanngai/models"
+DIST_CHECKPOINT_ROOT_FOLDER="/nas/ucb/jngai/calyapo/training/model_checkpointing"
 DIST_CHECKPOINT_FOLDER="fine-tuned"
 NUM_WORKERS_DATALOADER=1
 ONE_GPU=True
+WEIGHT_DECAY=0.1
+GAMMA=0.85
+LR=1e-5
+NUM_EPOCHS=100
+DATASET_PATH="calyapo/training/datasets"
+MODEL_NICKNAME="llama7b"
 
 print_header() {
     echo "------------------------------------------------"
@@ -76,12 +83,13 @@ print_header
 
 # --- Run Training with torchrun ---
 # NO SPACES AFTER THE BACKSLACH
+# DISABLE FSDP FOR DEBUGGING
 torchrun --nnodes=1 \
     --nproc-per-node=${NPROC_PER_NODE} \
     --master_port=${MASTER_PORT} \
     scripts/experiment/run_finetune.py \
-    --enable_fsdp \
-    --low_cpu_fsdp \
+    --enable_fsdp False \
+    --low_cpu_fsdp False \
     --fsdp_config.pure_bf16 \
     --use_peft=${USE_PEFT} \
     --use_fast_kernels \

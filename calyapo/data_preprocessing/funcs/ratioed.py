@@ -19,7 +19,10 @@ def get_unique_id(indiv_map: Dict):
 
     return id
 
-def indiv_valid_response(indiv_map: Dict, splt: str, check: str = 'all'):
+def indiv_valid_response(indiv_map: Dict, splt: str, check: str = None):
+    if check is None:
+        check = 'all'
+    
     option_map = indiv_map[splt].get('var_label2qst_option', {})
     
     if check == 'all':
@@ -47,6 +50,7 @@ def split_ratio(
         homogenous_plan: bool, 
         ques_split_varying: bool,
         train_setting: int, 
+        valid_indiv_setting: str = None, 
         out_path: str = None, 
         save: bool = False, 
         debug: bool = False, 
@@ -67,7 +71,7 @@ def split_ratio(
                 and
                 len(package['train']) == len(package['test'])
             )
-            print(f"Length of all splits equal: '{test}'")
+            print(f"(split_ratio | Debug) Length of all splits equal: '{test}'")
             
     if homogenous_plan and not ques_split_varying or train_setting == 1:
         if debug:
@@ -84,7 +88,7 @@ def split_ratio(
                 continue
 
             # doesn't matter which split, all the questions will be the same
-            if indiv_valid_response(indiv_map=indiv_map, splt='train', check='all'):
+            if indiv_valid_response(indiv_map=indiv_map, splt='train', check=valid_indiv_setting):
                 all_valid_indivs.append(indiv_map)
 
         if debug:
@@ -109,11 +113,11 @@ def split_ratio(
         val_valid_indivs = []
         test_valid_indivs = []
         for indiv_map in package['full']:
-            if indiv_valid_response(indiv_map=indiv_map, splt='train', check='all'):
+            if indiv_valid_response(indiv_map=indiv_map, splt='train', check=valid_indiv_setting):
                 train_valid_indivs.append(indiv_map)
-            if indiv_valid_response(indiv_map=indiv_map, splt='val', check='all'):
+            if indiv_valid_response(indiv_map=indiv_map, splt='val', check=valid_indiv_setting):
                 val_valid_indivs.append(indiv_map)
-            if indiv_valid_response(indiv_map=indiv_map, splt='val', check='all'):
+            if indiv_valid_response(indiv_map=indiv_map, splt='val', check=valid_indiv_setting):
                 test_valid_indivs.append(indiv_map)
 
         if debug:

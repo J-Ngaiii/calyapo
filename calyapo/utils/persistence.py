@@ -8,7 +8,7 @@ from calyapo.data_preprocessing.cleaning_objects import DataPackage
 
 LOADERS: dict[str, Callable[[Path], Any]] = {
     'csv': pd.read_csv,
-    'dta': pd.read_stata,
+    'dta': lambda p: pd.read_stata(p, convert_categoricals=False),
     'json': lambda p: json.loads(p.read_text()),
     'DataPackage': lambda p: DataPackage.from_dict(json.loads(p.read_text()))
 }

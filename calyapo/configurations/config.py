@@ -10,7 +10,8 @@ DATA_PATHS = {
         'intermediate' : Path('calyapo/data/intermediate/igs'), 
         'processed' : Path('calyapo/data/processed/igs'), 
         'penultimate' : UNIVERSAL_PENULTIMATE_FOLDER, 
-        'final' : UNIVERSAL_FINAL_FOLDER
+        'final' : UNIVERSAL_FINAL_FOLDER, 
+        'filetypes' : ['csv', 'dta']
     }, 
     'PPIC' : {
         'raw' : Path('calyapo/data/raw/ppic'), 
@@ -25,5 +26,57 @@ DATA_PATHS = {
         'processed' : Path('calyapo/data/processed/ces'), 
         'penultimate' : UNIVERSAL_PENULTIMATE_FOLDER, 
         'final' : UNIVERSAL_FINAL_FOLDER
+    }
+}
+
+IGS_RACE_MAP = {
+    '202402' : {
+        'Q24_1': '1',
+        'Q24_2': '2',
+        'Q24_3': '3',
+        'Q24_4': '4',
+        'Q24_5': '5',
+        'Q24_6': '6',
+        'Q24_7': '7'
+    }, 
+    '20240529' : {
+        'Q43_1': '1',
+        'Q43_2': '2',
+        'Q43_3': '3',
+        'Q43_4': '4',
+        'Q43_5': '5',
+        'Q43_6': '6',
+        'Q43_7': '7', 
+        'Q43_8': '8'
+    }, 
+    '20240819' : {
+        'Q38_1': '1',
+        'Q38_2': '2',
+        'Q38_3': '3',
+        'Q38_4': '4',
+        'Q38_5': '5',
+        'Q38_6': '6',
+        'Q38_7': '7', 
+        'Q38_8': '8'
+    }, 
+    '20240925' : {
+        'Q34_1': '1',
+        'Q34_2': '2',
+        'Q34_3': '3',
+        'Q34_4': '4',
+        'Q34_5': '5',
+        'Q34_6': '6',
+        'Q34_7': '7', 
+        'Q34_8': '8'
+    }, 
+    '20241028' : {
+        'Q24_1': '1',
+        'Q24_2': '2',
+        'Q24_3': '3',
+        'Q24_4': '4',
+        'Q24_5': '5',
+        'Q24_6': '6',
+        'Q24_7': '7', 
+        'Q24_8': '8'
     }
 }

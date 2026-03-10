@@ -1,5 +1,6 @@
 import pandas as pd
 
+from calyapo.configurations.config import DATA_PATHS
 from calyapo.configurations.data_map_config import TRAIN_PLANS
 from calyapo.data_preprocessing.funcs.raw_cleaners import *
 from calyapo.data_preprocessing.cleaning_objects import DataPackage
@@ -31,7 +32,7 @@ class RawHandler:
         if out_path is None:
             out_path = DATA_PATHS[dataset_name]['intermediate']
 
-        end_of_str_time_pat = '_([^_]+).csv'
+        end_of_str_time_pat = r'_([^_]+)\.'
         data, time_periods = file_loader(in_path=in_path, data_type=['csv', 'dta'], path_extract=end_of_str_time_pat, always_return_lst=True, debug=debug, verbose=verbose)
         inpack = DataPackage(
             dataset_name=dataset_name, 

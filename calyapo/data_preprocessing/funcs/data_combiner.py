@@ -58,7 +58,7 @@ def flatten_data_to_llama_format(raw_data_list: List[Dict], split: str) -> List[
             response_text = answer_data.get('option_text') # text description of chosen option, accurate to survey
             target_letter = answer_data.get('option_letter') # just the corresponding letter
             
-            # skip if missing
+            #FIX skip if missing 
             if not target_letter or target_letter == UNIVERSAL_NA_FILLER:
                 continue
                 
