@@ -51,7 +51,7 @@ NPROC_PER_NODE=1                      # Match this to your --gres=gpu count
 MASTER_PORT=$(expr 10000 + $(echo -n $SLURM_JOBID | tail -c 4)) # Random port to avoid collisions
 
 # Model/Data Params
-DATASET="ideology_to_ideology"
+DATASET="presidents_to_abortion"
 MODEL_NAME="meta-llama/Llama-2-7b-hf"
 OUTPUT_DIR="calyapo/training/checkpoints/${DATASET}"
 USE_PEFT=True
