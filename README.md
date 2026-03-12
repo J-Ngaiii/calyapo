@@ -24,6 +24,10 @@ CalyAPO is Jonathan Ngai's Data Science Honors Thesis repository for analyzing C
 - penultimate (json): compile all jsons from /processed directory based on dataset across time period
 - final (json): contains the actual steering : completion formatted jsons
 
+# Adding new datasets
+- add to training/configs/datasets.py
+- add to training/datasets/__init__.py
+
 # To Do
 - uniqieID for training on multiple questions so the samplers dont need to de-duplicate
 

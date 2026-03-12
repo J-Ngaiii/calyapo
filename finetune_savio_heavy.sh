@@ -1,19 +1,17 @@
 #!/bin/bash
 # from https://docs-research-it.berkeley.edu/services/high-performance-computing/user-guide/running-your-jobs/scheduler-examples/
 #SBATCH --job-name=calyapo_finetune_savio 
-#SBATCH --account=ic_datah195
-#SBATCH --partition=savio2_1080ti
+#SBATCH --account=fc_hartmanl2
+#SBATCH --partition=savio3_gpu
 #SBATCH --nodes=1
 #SBATCH --ntasks=2
 
 # Processors per task:
-# Two times the number of GPUs for 1080ti in savio2_1080ti
-#SBATCH --cpus-per-task=4
+# Eight times the number for A40 in savio3_gpu
+#SBATCH --cpus-per-task=8
 
 #Number of GPUs
-#SBATCH --gres=gpu:2
-
-#SBATCH --qos=savio_normal
+#SBATCH --gres=gpu:A40:2
 
 # Wall clock limit:
 #SBATCH --time=12:00:00
@@ -49,7 +47,7 @@ fi
 export TOKENIZERS_PARALLELISM=false # for debugging we wanna just use one gpu with batch size 1
 
 # Distributed Setup
-NPROC_PER_NODE=2                      # Match this to your --gres=gpu count
+NPROC_PER_NODE=2 # set to number of GPUs in --gres=gpu count
 MASTER_PORT=$(expr 10000 + $(echo -n $SLURM_JOBID | tail -c 4)) # Random port to avoid collisions
 
 # Model/Data Params
@@ -62,7 +60,7 @@ BATCH_SIZE_VALIDATION=8
 GRADIENT_ACCUMULATION_STEPS=4
 DIST_CHECKPOINT_ROOT_FOLDER="/nas/ucb/jngai/calyapo/training/model_checkpointing"
 DIST_CHECKPOINT_FOLDER="fine-tuned"
-NUM_WORKERS_DATALOADER=2
+NUM_WORKERS_DATALOADER=4 # set to half of --cpus-per-task
 ONE_GPU=False
 WEIGHT_DECAY=0.1
 GAMMA=0.85
@@ -82,12 +80,7 @@ print_header() {
 }
 
 print_header
-
-# --- Run Training with torchrun ---
-# NO SPACES AFTER THE BACKSLACH
-# DISABLE FSDP FOR DEBUGGING
 # 1080 cannot handle --fsdp_config.pure_bf16
-
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 torchrun --nnodes=1 \
@@ -96,7 +89,7 @@ torchrun --nnodes=1 \
     scripts/experiment/run_finetune.py \
     --enable_fsdp False \
     --low_cpu_fsdp False \
-    --fsdp_config.pure_bf16 False \
+    --fsdp_config.pure_bf16 True \
     --use_peft=${USE_PEFT} \
     --quantization "4bit" \
     --use_fast_kernels \

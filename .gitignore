@@ -5,3 +5,4 @@
 login_hf.py.env
 **env**
 wandb
+logs/

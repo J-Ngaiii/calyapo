@@ -66,7 +66,7 @@ class ideology_to_ideology_dataset (calyapo_dataset_config):
 
 @dataclass
 class presidents_to_abortion_dataset (calyapo_dataset_config):
-    dataset: str = "prez2abort" # override parent class
-    train_split: str = f"{str(UNIVERSAL_FINAL_FOLDER)}/ideology_to_ideology_train.jsonl"
-    test_split: str = f"{str(UNIVERSAL_FINAL_FOLDER)}/ideology_to_ideology_val.jsonl"
+    dataset: str = "presidents_to_abortion_dataset" # needs to match the DATASET_PREP in calyapo/training/datasets/__innit__.py
+    train_split: str = f"{str(UNIVERSAL_FINAL_FOLDER)}/presidents_to_abortion_train.jsonl"
+    test_split: str = f"{str(UNIVERSAL_FINAL_FOLDER)}/presidents_to_abortion_val.jsonl"
 
