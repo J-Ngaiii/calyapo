@@ -28,6 +28,21 @@ CalyAPO is Jonathan Ngai's Data Science Honors Thesis repository for analyzing C
 - add to training/configs/datasets.py
 - add to training/datasets/__init__.py
 
+# Finetuning execution
+- sbatch script executes caLL
+- scripts/experiment/run_finetune.py --> initiates fire call to execute the actual finetuning.py script
+- lines 328-342 --> get_preprocessed_dataset is called --> returns datasets
+    - get_preprocessed_dataset is defined in training/utils/dataset_utils what it does is:
+        - take in datset_config like that defined in training/configs/datasets.py
+        - access DATASET_PREPROC in training/datasets/__init__.py using dataset_config.dataset
+        - get the 'get_calyapo_dataset' method that's mapped in training/datasets/__init__.py but defined in training/datasets/calyapo_dataset.py
+        - initialize and execute the 'get_calyapo_dataset' method with 
+            - dataset_config
+            - tokenizer
+            - output of internally defined get_split() function which outputs dataset_config.train or dataset_config.test path directly based on the split get_preprocessed_dataset got initially
+        - get_calyapo_dataset then executes and returns 
+        - that recursively goes back yp to be the output of get_preprocessed_dataset
+
 # To Do
 - uniqieID for training on multiple questions so the samplers dont need to de-duplicate
 

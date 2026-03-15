@@ -12,6 +12,7 @@
 
 #Number of GPUs
 #SBATCH --gres=gpu:A40:2
+#SBATCH --qos=a40_gpu3_normal
 
 # Wall clock limit:
 #SBATCH --time=12:00:00
@@ -51,12 +52,12 @@ NPROC_PER_NODE=2 # set to number of GPUs in --gres=gpu count
 MASTER_PORT=$(expr 10000 + $(echo -n $SLURM_JOBID | tail -c 4)) # Random port to avoid collisions
 
 # Model/Data Params
-DATASET="presidents_to_abortion"
+DATASET="presidents_to_abortion_dataset"
 MODEL_NAME="meta-llama/Llama-2-7b-hf"
 OUTPUT_DIR="calyapo/training/checkpoints/${DATASET}"
 USE_PEFT=True
-BATCH_SIZE_TRAINING=4
-BATCH_SIZE_VALIDATION=8
+BATCH_SIZE_TRAINING=8
+BATCH_SIZE_VALIDATION=16
 GRADIENT_ACCUMULATION_STEPS=4
 DIST_CHECKPOINT_ROOT_FOLDER="/nas/ucb/jngai/calyapo/training/model_checkpointing"
 DIST_CHECKPOINT_FOLDER="fine-tuned"
@@ -65,7 +66,7 @@ ONE_GPU=False
 WEIGHT_DECAY=0.1
 GAMMA=0.85
 LR=1e-5
-NUM_EPOCHS=100
+NUM_EPOCHS=3
 DATASET_PATH="calyapo/training/datasets"
 MODEL_NICKNAME="llama7b"
 

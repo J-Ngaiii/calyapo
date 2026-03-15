@@ -4,19 +4,19 @@
 #SBATCH --account=ic_datah195
 #SBATCH --partition=savio2_1080ti
 #SBATCH --nodes=1
-#SBATCH --ntasks=2
+#SBATCH --ntasks=4
 
 # Processors per task:
 # Two times the number of GPUs for 1080ti in savio2_1080ti
-#SBATCH --cpus-per-task=4
+#SBATCH --cpus-per-task=2
 
 #Number of GPUs
-#SBATCH --gres=gpu:2
+#SBATCH --gres=gpu:4
 
 #SBATCH --qos=savio_normal
 
 # Wall clock limit:
-#SBATCH --time=12:00:00
+#SBATCH --time=28:00:00
 
 #SBATCH --output=logs/%j.out
 #SBATCH --error=logs/%j.err
@@ -49,17 +49,17 @@ fi
 export TOKENIZERS_PARALLELISM=false # for debugging we wanna just use one gpu with batch size 1
 
 # Distributed Setup
-NPROC_PER_NODE=2                      # Match this to your --gres=gpu count
+NPROC_PER_NODE=4                      # Match this to your --gres=gpu count
 MASTER_PORT=$(expr 10000 + $(echo -n $SLURM_JOBID | tail -c 4)) # Random port to avoid collisions
 
 # Model/Data Params
-DATASET="presidents_to_abortion"
+DATASET="presidents_to_abortion_dataset"
 MODEL_NAME="meta-llama/Llama-2-7b-hf"
 OUTPUT_DIR="calyapo/training/checkpoints/${DATASET}"
 USE_PEFT=True
 BATCH_SIZE_TRAINING=4
 BATCH_SIZE_VALIDATION=8
-GRADIENT_ACCUMULATION_STEPS=4
+GRADIENT_ACCUMULATION_STEPS=2
 DIST_CHECKPOINT_ROOT_FOLDER="/nas/ucb/jngai/calyapo/training/model_checkpointing"
 DIST_CHECKPOINT_FOLDER="fine-tuned"
 NUM_WORKERS_DATALOADER=2
@@ -67,7 +67,7 @@ ONE_GPU=False
 WEIGHT_DECAY=0.1
 GAMMA=0.85
 LR=1e-5
-NUM_EPOCHS=100
+NUM_EPOCHS=3
 DATASET_PATH="calyapo/training/datasets"
 MODEL_NICKNAME="llama7b"
 
@@ -123,7 +123,7 @@ torchrun --nnodes=1 \
     --seed 42 \
     --one_gpu ${ONE_GPU} \
     --use_wandb \
-    --save_model \
+    --save_model True \
     --save_metrics \
-    --save_optimizer \
+    --save_optimizer True \
     --low_cpu_mem_usage True

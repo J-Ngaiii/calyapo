@@ -54,7 +54,6 @@ def process_csv(data: pd.DataFrame, dataset_name: str, train_plan: str, debug: b
         for var_label in tp_wrap.get_var_lst('train_resp'):
             csv_col = label2var.get(var_label)
             if csv_col and csv_col in row:
-                # activates if given theres an nan value
                 entry.add_train(var_label, row[csv_col])
                 
 
@@ -91,7 +90,6 @@ def process_csv(data: pd.DataFrame, dataset_name: str, train_plan: str, debug: b
     
     return pack
 
-
 def split_questions(
         data: List[pd.DataFrame], 
         dataset_name: str, 
@@ -110,6 +108,9 @@ def split_questions(
     master_train: List[Dict] = []
     master_val: List[Dict] = []
     master_test: List[Dict] = []
+
+    if verbose: print(f"(split_question) recieving '{len(data)}' dataframes")
+
     for df in data:
         pack = process_csv(data=df, dataset_name=dataset_name, train_plan=train_plan, debug=debug, verbose=verbose)
 
@@ -138,7 +139,10 @@ def split_questions(
     master_pack.add_data('test', master_test)
 
     if debug:
-        print(f"(split_question | Debug) master_pack['full'] empty: {master_pack.get('full') is None}")
+        print(f"(split_question | Debug) master_pack['full'] empty: '{master_pack.get('full') is None}'")
+
+    if verbose:
+        print(f"(split_question) processed '{len(master_pack['full'])}' individual maps")
 
     if save:
         assert out_path is not None, f"(split_questions) Cannot save files without valid out path"

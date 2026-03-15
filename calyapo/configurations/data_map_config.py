@@ -10,7 +10,7 @@ VARLABEL_DESC = {
     'partyid': 'Party Identity',
     'dataset_id': 'Respondent ID',
     'ideology': 'Political Ideology',
-    'trump_opinion': 'Trump Favorability',
+    'trump_opinion': 'Donald Trump Favorability',
     'oppose_abortion_senate': 'Importance of Senatorial Candidate Opposing Abortion Rights',
     'defend_abortion_senate': 'Importance of Senatorial Candidate Defending Abortion Rights',
     'prop1_2024': 'California Proposition 1',
@@ -21,7 +21,8 @@ VARLABEL_DESC = {
     'env_urban': 'Residence Urbanicity', 
     'marital' : 'Marital Status', 
     'oppose_immigration_senate' : 'Importance of Senatorial Candidate Immigration Toughness',
-    'biden_opinion' : 'Biden Favorability',
+    'biden_opinion' : 'Joe Biden Favorability',
+    'harris_opinion' : 'Kamala Harris Favorability'
 }
 
 # IGS finetuning variable maps
@@ -46,6 +47,13 @@ PREZ_ABORTION =  {
     'test_resp' : ['oppose_abortion_senate', 'defend_abortion_senate']
 } # simulate low information voter that doesn't have policy stances
 
+TEST_PLAN = {
+    'demo' : ['age', 'partyid', 'ideology', 'race', 'gender', 'sex', 'env_urban', 'marital'], 
+    'train_resp' : ['trump_opinion', 'biden_opinion'], 
+    'val_resp' : ['oppose_immigration_senate', 'harris_opinion'], 
+    'test_resp' : ['oppose_immigration_senate', 'harris_opinion']
+}
+
 
 # all plans
 TRAIN_PLANS = {
@@ -69,6 +77,14 @@ TRAIN_PLANS = {
         }, 
     'presidents_to_abortion' : {
             'variable_map': PREZ_ABORTION, 
+            'homogenous_var_plan' : False, 
+            'datasets' : set(['IGS']), 
+            'question_varies_by_split' : True, # of course will be true
+            'train_setting' : 2, 
+            'valid_indiv_setting' : 'any'
+        }, 
+    'TEST_PLAN' : {
+            'variable_map': TEST_PLAN, 
             'homogenous_var_plan' : False, 
             'datasets' : set(['IGS']), 
             'question_varies_by_split' : True, # of course will be true

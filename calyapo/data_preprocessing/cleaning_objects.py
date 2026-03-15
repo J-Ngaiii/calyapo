@@ -201,26 +201,27 @@ class Individual:
             
         return decoders
     
-    def _process_response(self, variable_label: str, raw_val: Any, debug_var_label = None):
+    def _process_response(self, variable_label: str, raw_val: Any):
         """Helper to decode a raw value into text."""
-        # debug this
         raw_str = str(raw_val).strip()
 
-        if variable_label == debug_var_label:
-            print(f"raw val: ", raw_str)
-            print(f"var label: ", variable_label)
-            print(f"decoder: ", self.opt_decoders)
+        # if self.time_period == '20240819':
+        #     print(f"raw val: ", raw_str)
+        #     print(f"var label: ", variable_label)
+        #     print(f"decoder: ", self.opt_decoders)
 
-            print("label existence: ", variable_label in self.opt_decoders)
-            print("raw value existence: ", raw_str in self.opt_decoders[variable_label])
+        #     print("label existence: ", variable_label in self.opt_decoders)
+        #     print("raw value existence: ", raw_str in self.opt_decoders[variable_label])
 
         if variable_label in self.opt_decoders and raw_str in self.opt_decoders[variable_label]:
             return self.opt_decoders[variable_label][raw_str]
         
         try:
             raw_int = int(float(raw_str)) # Handle "1.0" -> 1
-            if variable_label in self.opt_decoders and raw_int in self.opt_decoders[variable_label]:
-                return self.opt_decoders[variable_label][raw_int]
+            normalized_str = str(int(float(raw_str))) 
+        
+            if variable_label in self.opt_decoders and normalized_str in self.opt_decoders[variable_label]:
+                return self.opt_decoders[variable_label][normalized_str]
         except ValueError:
             pass
         
@@ -359,6 +360,8 @@ class TrainPlanWrapper:
         self.train_plan = train_plan # tracked for metadata only
 
         self.variable_map = self.plan_config.get('variable_map') # variable_map = {'demo' : ['age', 'partyid'], 'train_resp' : ['ideology'], 'val_resp' : ['trump_opinion']}
+        if self.variable_map is None:
+            raise ValueError(f"(TrainPlanWrap) Could not find variable map for dataset '{dataset_name}' and training plan '{train_plan}'")
 
     def get_var_lst(self, split: str):
         """
@@ -371,4 +374,5 @@ class TrainPlanWrapper:
         if split not in self.variable_map:
             raise ValueError(f"Unknown split arg: {split}. Choose from: {self.dataset_plan.keys()}.")
         
-        return self.variable_map[split]
+        output: List[str] = self.variable_map[split] # for split 'val_resp' we might have ['oppose_abortion_senate', 'defend_abortion_senate']
+        return output

@@ -19,12 +19,16 @@ def get_unique_id(indiv_map: Dict):
 
     return id
 
-def indiv_valid_response(indiv_map: Dict, splt: str, check: str = None):
+def indiv_valid_response(indiv_map: Dict, splt: str, check: str = None, debug: str = False):
     if check is None:
         check = 'all'
     
     option_map = indiv_map[splt].get('var_label2qst_option', {})
-    
+
+    # if debug:
+        # if indiv_map['time'] != '202402':
+        #     print(f"(indiv_valid | Debug) time period '{indiv_map['time']}' option_map: {option_map}")
+        
     if check == 'all':
         # need to iterate thru all the label : option_dict values
         # option_map = {
@@ -88,13 +92,14 @@ def split_ratio(
                 continue
 
             # doesn't matter which split, all the questions will be the same
-            if indiv_valid_response(indiv_map=indiv_map, splt='train', check=valid_indiv_setting):
+            if indiv_valid_response(indiv_map=indiv_map, splt='train', check=valid_indiv_setting, debug=debug):
                 all_valid_indivs.append(indiv_map)
 
         if debug:
             print(f"(split_ratio| Debug) num unique individuals: '{len(all_valid_indivs)}'\n(split_ratio| Debug) length of initial package: '{len(package['full'])}'")
         
-        indices = list(range(len(all_valid_indivs)))
+        indices = np.random.choice(len(all_valid_indivs), size=len(all_valid_indivs), replace=False)
+
         random.shuffle(indices)
         
         n = len(all_valid_indivs)
@@ -113,20 +118,27 @@ def split_ratio(
         val_valid_indivs = []
         test_valid_indivs = []
         for indiv_map in package['full']:
-            if indiv_valid_response(indiv_map=indiv_map, splt='train', check=valid_indiv_setting):
+            if indiv_valid_response(indiv_map=indiv_map, splt='train', check=valid_indiv_setting, debug=debug):
                 train_valid_indivs.append(indiv_map)
-            if indiv_valid_response(indiv_map=indiv_map, splt='val', check=valid_indiv_setting):
+            if indiv_valid_response(indiv_map=indiv_map, splt='val', check=valid_indiv_setting, debug=debug):
                 val_valid_indivs.append(indiv_map)
-            if indiv_valid_response(indiv_map=indiv_map, splt='val', check=valid_indiv_setting):
+            if indiv_valid_response(indiv_map=indiv_map, splt='val', check=valid_indiv_setting, debug=debug):
                 test_valid_indivs.append(indiv_map)
 
         if debug:
             print(f"(split_ratio| Debug) num train individuals: '{len(train_valid_indivs)}'\n(split_ratio| Debug) num val individuals: '{len(val_valid_indivs)}'\n(split_ratio| Debug) num val individuals: '{len(test_valid_indivs)}'")
         
+        # reduce total num of val and test datapoints
+        num_train = len(train_valid_indivs)
+        val_size = int(num_train * target_ratios['val'])
+        test_size = int(num_train * target_ratios['test'])
+        val_indices = np.random.choice(len(val_valid_indivs), size=min(len(val_valid_indivs), val_size), replace=False)
+        test_indices = np.random.choice(len(test_valid_indivs), size=min(len(test_valid_indivs), test_size), replace=False)
+
         outPack = DataPackage(package.dataset_name, package.train_plan, package.time_period)
         outPack['train'] = train_valid_indivs
-        outPack['val'] = val_valid_indivs
-        outPack['test'] = test_valid_indivs
+        outPack['val'] = list(np.array(val_valid_indivs)[val_indices])
+        outPack['test'] = list(np.array(test_valid_indivs)[test_indices])
     else:
         # see which split set has the least data points --> check if that is less than the respective ratios
         # if num data points in split set with the least data points is less than its ratio (eg we have less val datapoints than what we should have for val_ratio = 0.2)
@@ -144,7 +156,7 @@ def split_ratio(
             valid_indivs = [] # assemble all the individual ids
             for indiv_map in package[spl]:
                 indiv_map: Dict
-                if indiv_valid_response(indiv_map=indiv_map, splt=spl, check='all'):
+                if indiv_valid_response(indiv_map=indiv_map, splt=spl, check=valid_indiv_setting, debug=debug):
                     all_valid_indivs.append(indiv_map)
             
             splits[i] = valid_indivs

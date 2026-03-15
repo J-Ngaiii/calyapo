@@ -180,7 +180,7 @@ IGS_LABEL_TO_QES_240529 =  {
 IGS_VAR_TO_LABEL_240819 = {
     'ID' : 'dataset_id',
     'Q35' : 'age', 
-    'pid3' : 'partyid', 
+    'party_reg' : 'partyid', 
     'Q47' : 'ideology', 
     'racial_id' : 'race', 
     'Q36' : 'gender', 
@@ -309,7 +309,7 @@ IGS_LABEL_TO_QES_240819 =  {
 IGS_VAR_TO_LABEL_240925 = {
     'ID' : 'dataset_id',
     'Q31' : 'age', 
-    'pid3' : 'partyid', 
+    'party_reg' : 'partyid', 
     'Q41' : 'ideology', 
     'racial_id' : 'race', 
     'Q32' : 'gender', 
@@ -443,7 +443,7 @@ IGS_LABEL_TO_QES_240925 =  {
 IGS_VAR_TO_LABEL_241028 = {
     'ID' : 'dataset_id',
     'Q21' : 'age', 
-    'pid3' : 'partyid', 
+    'party_reg' : 'partyid', 
     'Q31' : 'ideology', 
     'racial_id' : 'race', 
     'Q22' : 'gender', 
