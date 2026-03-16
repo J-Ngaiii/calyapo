@@ -24,6 +24,8 @@ from calyapo.training.policies import fpSixteen,bfSixteen, get_llama_wrapper
 from calyapo.training.utils.memory_utils import MemoryTrace
 from accelerate.utils import is_xpu_available, is_ccl_available
 from calyapo.training.utils.flop_utils import FlopMeasure
+from calyapo.training.utils.eval_utils import compute_accuracy
+
 def set_tokenizer_params(tokenizer: LlamaTokenizer):
     tokenizer.pad_token_id = 0
     tokenizer.padding_side = "left"
@@ -106,8 +108,12 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
         metrics_filename = f"{train_config.output_dir}/metrics_data_{local_rank}-{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.json"
         train_step_perplexity = []
         train_step_loss = []
+        train_accuracy = [] # ADDED
+        train_predictions = [] # ADDED
         val_step_loss = []
         val_step_perplexity = []
+        val_accuracy = [] # ADDED
+        val_predictions = [] # ADDED
 
     epoch_times = []
     checkpoint_times = []
@@ -149,12 +155,22 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
                             elif torch.cuda.is_available():
                                 batch[key] = batch[key].to('cuda:0')
                     with autocast():
-                        loss = model(**batch).loss
+                        outputs = model(**batch)
+                        loss = outputs.loss
+                        logits = outputs.logits # ADDED
                     total_loss += loss.detach().float()
                     loss = loss / gradient_accumulation_steps
                     if train_config.save_metrics:
                         train_step_loss.append(loss.detach().float().item())
                         train_step_perplexity.append(float(torch.exp(loss.detach().float())))
+
+                        # track accuracy
+                        step_correct, step_total = compute_accuracy(logits, batch["labels"]) # ADDED
+                        step_acc = step_correct / step_total if step_total > 0 else 0 # ADDED
+                        train_accuracy.append(step_acc) # ADDED
+
+                        # track predictions for roll-up later
+                        train_predictions.append(logits.argmax(dim=-1).detach().cpu()) # ADDED
                     if train_config.use_fp16:
                         # if fp16 is enabled, use gradient scaler to handle gradient update
                         scaler.scale(loss).backward()
@@ -191,6 +207,7 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
                                 'train/epoch': epoch + 1,
                                 'train/step': epoch * len(train_dataloader) + step,
                                 'train/loss': loss.detach().float(),
+                                'train/accuracy': step_acc # ADDED
                             })
 
                     pbar.set_description(f"Training Epoch: {epoch+1}/{train_config.num_epochs}, step {step}/{len(train_dataloader)} completed (loss: {loss.detach().float()})")
@@ -221,10 +238,12 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
         lr_scheduler.step()
         should_save_model = train_config.save_model
         if train_config.run_validation:
-            eval_ppl, eval_epoch_loss, temp_val_loss, temp_step_perplexity = evaluation(model, train_config, eval_dataloader, local_rank, tokenizer, wandb_run)
+            eval_ppl, eval_epoch_loss, temp_val_loss, temp_step_perplexity, temp_val_accuracy, eval_epoch_accuracy, temp_val_preds = evaluation(model, train_config, eval_dataloader, local_rank, tokenizer, wandb_run) # ADDED
             if train_config.save_metrics:
                 val_step_loss.extend(temp_val_loss)
                 val_step_perplexity.extend(temp_step_perplexity)
+                val_accuracy.extend(temp_val_accuracy) # ADDED
+                val_predictions.extend(temp_val_preds) # ADDED
             should_save_model = train_config.save_model and eval_epoch_loss < best_val_loss
         
         checkpoint_start_time = time.perf_counter()
@@ -342,6 +361,8 @@ def evaluation(model,train_config, eval_dataloader, local_rank, tokenizer, wandb
     eval_preds = []
     val_step_loss = []
     val_step_perplexity = []
+    val_setp_accuracy = [] # ADDED
+    val_step_preds = [] # ADDED
     eval_loss = 0.0  # Initialize evaluation loss
     total_eval_steps = 0
     with MemoryTrace() as memtrace:
@@ -365,9 +386,18 @@ def evaluation(model,train_config, eval_dataloader, local_rank, tokenizer, wandb
                 # Forward pass and compute loss
                 outputs = model(**batch)
                 loss = outputs.loss
+                logits = outputs.logits # ADDED
                 if train_config.save_metrics:
                     val_step_loss.append(loss.detach().float().item())
                     val_step_perplexity.append(float(torch.exp(loss.detach().float())))
+
+                    # track accuracy
+                    step_correct, step_total = compute_accuracy(logits, batch["labels"]) # ADDED
+                    step_acc = step_correct / step_total if step_total > 0 else 0 # ADDED
+                    val_setp_accuracy.append(step_acc) # ADDED
+
+                    # save predictions for future roll-up
+                    val_step_preds.append(logits.argmax(dim=-1).detach().cpu()) # ADDED
 
                 eval_loss += loss.detach().float()
             # Decode predictions and add to evaluation predictions list
@@ -388,6 +418,9 @@ def evaluation(model,train_config, eval_dataloader, local_rank, tokenizer, wandb
         eval_epoch_loss = eval_epoch_loss/world_size
     eval_ppl = torch.exp(eval_epoch_loss)
 
+    # compute average accuracy
+    eval_epoch_accuracy = sum(val_setp_accuracy) / len(val_setp_accuracy) if val_setp_accuracy else 0
+
     # Print evaluation metrics
     if train_config.enable_fsdp:
         if local_rank==0:
@@ -399,9 +432,10 @@ def evaluation(model,train_config, eval_dataloader, local_rank, tokenizer, wandb
         wandb_run.log({
                         'eval/perplexity': eval_ppl,
                         'eval/loss': eval_epoch_loss,
+                        'epoch/accuracy': eval_epoch_accuracy
                     }, commit=False)
 
-    return eval_ppl, eval_epoch_loss, val_step_loss, val_step_perplexity
+    return eval_ppl, eval_epoch_loss, val_step_loss, val_step_perplexity, val_step_accuracy, eval_epoch_accuracy, val_step_preds # ADDED
 
 def freeze_transformer_layers(model, num_layer):
    for i, layer in enumerate(model.model.layers):

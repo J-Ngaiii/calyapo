@@ -171,6 +171,7 @@ def main(**kwargs):
         processor.tokenizer.padding_side = "right"
         model.supports_gradient_checkpointing = True
         model.language_model.supports_gradient_checkpointing = True
+        print(f"--> Using vision model of type '{config.model_type}' ")
     elif config.model_type == "llama":
         is_vision = False
         model = LlamaForCausalLM.from_pretrained(
@@ -185,6 +186,7 @@ def main(**kwargs):
             ),
             torch_dtype=torch.float16 if train_config.use_fp16 else "auto",
         )
+        print(f"--> Using language model of type '{config.model_type}' ")
     else:
         raise ValueError(
             f"Model type {config.model_type} is not supported. Please use llama or mllama model."

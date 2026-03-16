@@ -31,6 +31,8 @@ CalyAPO is Jonathan Ngai's Data Science Honors Thesis repository for analyzing C
 # Finetuning execution
 - sbatch script executes caLL
 - scripts/experiment/run_finetune.py --> initiates fire call to execute the actual finetuning.py script
+- lines 152 --> create a config object from train_config.model_name, train_config itself comes from training/configs/training.py and should get overridden partially by arguments in the sbatch
+- lines 153-197 we define the 'model' object based on based on config.model_type
 - lines 328-342 --> get_preprocessed_dataset is called --> returns datasets
     - get_preprocessed_dataset is defined in training/utils/dataset_utils what it does is:
         - take in datset_config like that defined in training/configs/datasets.py
@@ -42,6 +44,24 @@ CalyAPO is Jonathan Ngai's Data Science Honors Thesis repository for analyzing C
             - output of internally defined get_split() function which outputs dataset_config.train or dataset_config.test path directly based on the split get_preprocessed_dataset got initially
         - get_calyapo_dataset then executes and returns 
         - that recursively goes back yp to be the output of get_preprocessed_dataset
+- lines 416 the train() call actually happens, train() is defined in training/utils/train_utils.py
+    - line 241 of train_utils.py: evaluation() gets called
+
+# Adding Metrics (all under train_utils.py)
+- for train metrics:
+    - line 105: add tracking lists under the 'if train_config.save_metrics' condition
+    - line 163: add metrics under train_config.save_metrics
+    - line 210: add metrics under wandb.log
+    - line 319: save metrics to json
+- for val metrics:
+    - line 105: add tracking lists under the 'if train_config.save_metrics' condition
+    - line 241: handle for evaluation() outputting more statistics then save them accordingly
+    - line 363: add validation tracking lists
+    - line 389: update validation tracking lists
+    - under line 419: remember to also calculate average of the metric across all epochs
+    - line 422: wandb update validation metrics
+    - line 428: return validation tracking lists
+    - line 319: save metrics to json
 
 # To Do
 - uniqieID for training on multiple questions so the samplers dont need to de-duplicate
