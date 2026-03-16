@@ -24,7 +24,7 @@ from calyapo.training.policies import fpSixteen,bfSixteen, get_llama_wrapper
 from calyapo.training.utils.memory_utils import MemoryTrace
 from accelerate.utils import is_xpu_available, is_ccl_available
 from calyapo.training.utils.flop_utils import FlopMeasure
-from calyapo.training.utils.eval_utils import compute_accuracy
+from calyapo.training.utils.eval_utils import compute_accuracy, save_prediction_to_rollup
 
 def set_tokenizer_params(tokenizer: LlamaTokenizer):
     tokenizer.pad_token_id = 0
@@ -99,8 +99,10 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
     autocast = torch.cuda.amp.autocast if train_config.use_fp16 else nullcontext
     train_prep = []
     train_loss = []
+    train_acc = []
     val_prep = []
     val_loss =[]
+    val_acc = []
 
     if train_config.save_metrics:
         if not os.path.exists(train_config.output_dir):
@@ -108,12 +110,12 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
         metrics_filename = f"{train_config.output_dir}/metrics_data_{local_rank}-{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.json"
         train_step_perplexity = []
         train_step_loss = []
-        train_accuracy = [] # ADDED
-        train_predictions = [] # ADDED
+        train_step_accuracy = [] # ADDED
+        # train_step_predictions = [] # ADDED
         val_step_loss = []
         val_step_perplexity = []
-        val_accuracy = [] # ADDED
-        val_predictions = [] # ADDED
+        val_step_accuracy = [] # ADDED
+        # val_step_predictions = [] # ADDED
 
     epoch_times = []
     checkpoint_times = []
@@ -129,6 +131,7 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
         if max_steps_reached:
             break
         epoch_start_time = time.perf_counter()
+        epoch_correct, epoch_total = 0, 0 # ADDED
         with MemoryTrace() as memtrace:  # track the memory usage
             model.train()
             total_loss = 0.0
@@ -158,19 +161,32 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
                         outputs = model(**batch)
                         loss = outputs.loss
                         logits = outputs.logits # ADDED
+
+                    # --- NEW ---
+                    # epoch accuracy tracking
+                    step_correct, step_total_tokens = compute_accuracy(logits, batch["labels"])
+                    epoch_correct += step_correct
+                    epoch_total += step_total_tokens
+                    step_acc = step_correct / step_total_tokens if step_total_tokens > 0 else 0
+
+                    # epoch prediction roll up (STREAM TO DISK EVERY 100 STEPS) 
+                    # if train_config.save_metrics and total_train_steps % 100 == 0:
+                    #     save_prediction_to_rollup(
+                    #         train_config.output_dir, local_rank, epoch, total_train_steps,
+                    #         logits.argmax(dim=-1).detach().cpu(), batch["labels"].detach().cpu(), tokenizer
+                    #     )
+                    # --- NEW ---
+
                     total_loss += loss.detach().float()
                     loss = loss / gradient_accumulation_steps
+
                     if train_config.save_metrics:
                         train_step_loss.append(loss.detach().float().item())
                         train_step_perplexity.append(float(torch.exp(loss.detach().float())))
 
                         # track accuracy
-                        step_correct, step_total = compute_accuracy(logits, batch["labels"]) # ADDED
-                        step_acc = step_correct / step_total if step_total > 0 else 0 # ADDED
-                        train_accuracy.append(step_acc) # ADDED
+                        train_step_accuracy.append(step_acc) # ADDED
 
-                        # track predictions for roll-up later
-                        train_predictions.append(logits.argmax(dim=-1).detach().cpu()) # ADDED
                     if train_config.use_fp16:
                         # if fp16 is enabled, use gradient scaler to handle gradient update
                         scaler.scale(loss).backward()
@@ -213,7 +229,7 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
                     pbar.set_description(f"Training Epoch: {epoch+1}/{train_config.num_epochs}, step {step}/{len(train_dataloader)} completed (loss: {loss.detach().float()})")
 
                     if train_config.save_metrics:
-                        save_to_json(metrics_filename, train_step_loss, train_loss, train_step_perplexity, train_prep, val_step_loss, val_loss, val_step_perplexity, val_prep)
+                        save_to_json(metrics_filename, train_step_loss, train_loss, train_step_perplexity, train_prep, train_step_accuracy, train_acc, val_step_loss, val_loss, val_step_perplexity, val_prep, val_step_accuracy, val_acc)
                 pbar.close()
 
         epoch_end_time = time.perf_counter()-epoch_start_time
@@ -227,9 +243,11 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
         if train_config.enable_fsdp:
             train_epoch_loss = train_epoch_loss/world_size
         train_perplexity = torch.exp(train_epoch_loss)
+        train_epoch_accuracy = epoch_correct / epoch_total if epoch_total > 0 else 0
 
         train_prep.append(float(train_perplexity))
         train_loss.append(float(train_epoch_loss))
+        train_acc.append(float(train_epoch_accuracy))
 
         if not train_config.enable_fsdp or rank==0:
             memtrace.print_stats()
@@ -238,12 +256,11 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
         lr_scheduler.step()
         should_save_model = train_config.save_model
         if train_config.run_validation:
-            eval_ppl, eval_epoch_loss, temp_val_loss, temp_step_perplexity, temp_val_accuracy, eval_epoch_accuracy, temp_val_preds = evaluation(model, train_config, eval_dataloader, local_rank, tokenizer, wandb_run) # ADDED
+            eval_ppl, eval_epoch_loss, temp_val_loss, temp_step_perplexity, temp_val_accuracy, eval_epoch_accuracy = evaluation(model, train_config, eval_dataloader, local_rank, tokenizer, wandb_run) # ADDED
             if train_config.save_metrics:
                 val_step_loss.extend(temp_val_loss)
                 val_step_perplexity.extend(temp_step_perplexity)
-                val_accuracy.extend(temp_val_accuracy) # ADDED
-                val_predictions.extend(temp_val_preds) # ADDED
+                val_step_accuracy.extend(temp_val_accuracy) # ADDED
             should_save_model = train_config.save_model and eval_epoch_loss < best_val_loss
         
         checkpoint_start_time = time.perf_counter()
@@ -316,7 +333,7 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
 
         # Saving the results every epoch to plot later
         if train_config.save_metrics:
-            save_to_json(metrics_filename, train_step_loss, train_loss, train_step_perplexity, train_prep, val_step_loss, val_loss, val_step_perplexity, val_prep)
+            save_to_json(metrics_filename, train_step_loss, train_loss, train_step_perplexity, train_prep, train_step_accuracy, train_acc, val_step_loss, val_loss, val_step_perplexity, val_prep, val_step_accuracy, val_acc)
 
     avg_epoch_time = sum(epoch_times)/ len(epoch_times)
     avg_checkpoint_time = sum(checkpoint_times)/ len(checkpoint_times) if len(checkpoint_times) > 0 else 0
@@ -361,9 +378,11 @@ def evaluation(model,train_config, eval_dataloader, local_rank, tokenizer, wandb
     eval_preds = []
     val_step_loss = []
     val_step_perplexity = []
-    val_setp_accuracy = [] # ADDED
-    val_step_preds = [] # ADDED
+    val_step_accuracy = [] # ADDED
+    # val_step_preds = [] # ADDED
     eval_loss = 0.0  # Initialize evaluation loss
+    total_correct = 0 # ADDED
+    total_tokens = 0 # ADDED
     total_eval_steps = 0
     with MemoryTrace() as memtrace:
         for step, batch in enumerate(tqdm(eval_dataloader,colour="green", desc="evaluating Epoch", dynamic_ncols=True)):
@@ -394,10 +413,13 @@ def evaluation(model,train_config, eval_dataloader, local_rank, tokenizer, wandb
                     # track accuracy
                     step_correct, step_total = compute_accuracy(logits, batch["labels"]) # ADDED
                     step_acc = step_correct / step_total if step_total > 0 else 0 # ADDED
-                    val_setp_accuracy.append(step_acc) # ADDED
+                    val_step_accuracy.append(step_acc) # ADDED
+
+                    total_correct += step_correct
+                    total_tokens += step_total
 
                     # save predictions for future roll-up
-                    val_step_preds.append(logits.argmax(dim=-1).detach().cpu()) # ADDED
+                    # val_step_preds.append(logits.argmax(dim=-1).detach().cpu()) # ADDED
 
                 eval_loss += loss.detach().float()
             # Decode predictions and add to evaluation predictions list
@@ -419,7 +441,7 @@ def evaluation(model,train_config, eval_dataloader, local_rank, tokenizer, wandb
     eval_ppl = torch.exp(eval_epoch_loss)
 
     # compute average accuracy
-    eval_epoch_accuracy = sum(val_setp_accuracy) / len(val_setp_accuracy) if val_setp_accuracy else 0
+    eval_epoch_accuracy = total_correct / total_tokens if total_tokens > 0 else 0
 
     # Print evaluation metrics
     if train_config.enable_fsdp:
@@ -435,7 +457,7 @@ def evaluation(model,train_config, eval_dataloader, local_rank, tokenizer, wandb
                         'epoch/accuracy': eval_epoch_accuracy
                     }, commit=False)
 
-    return eval_ppl, eval_epoch_loss, val_step_loss, val_step_perplexity, val_step_accuracy, eval_epoch_accuracy, val_step_preds # ADDED
+    return eval_ppl, eval_epoch_loss, val_step_loss, val_step_perplexity, val_step_accuracy, eval_epoch_accuracy # ADDED
 
 def freeze_transformer_layers(model, num_layer):
    for i, layer in enumerate(model.model.layers):
@@ -606,16 +628,32 @@ def save_train_params(train_config, fsdp_config, rank):
         if rank==0:
             print(f"training params are saved in {file_name}")
 
-def save_to_json(output_filename, train_step_loss, train_epoch_loss, train_step_ppl, train_epoch_ppl, val_step_loss, val_epoch_loss, val_step_ppl, val_epoch_ppl):
+def save_to_json(
+        output_filename, 
+        train_step_loss, 
+        train_epoch_loss, 
+        train_step_ppl, 
+        train_epoch_ppl, 
+        train_step_accuracy, 
+        train_epoch_accuracy
+        val_step_loss, 
+        val_epoch_loss, 
+        val_step_ppl, 
+        val_epoch_ppl
+    ):
     metrics_data = {
         "train_step_loss": train_step_loss,
         "train_epoch_loss": train_epoch_loss,
         "train_step_perplexity": train_step_ppl,
         "train_epoch_perplexity": train_epoch_ppl,
+        "train_step_accuracy": train_step_accuracy, # ADDED
+        "train_epoch_accuracy": train_epoch_accuracy, # ADDED
         "val_step_loss": val_step_loss,
         "val_epoch_loss": val_epoch_loss,
         "val_step_perplexity": val_step_ppl,
-        "val_epoch_perplexity": val_epoch_ppl
+        "val_epoch_perplexity": val_epoch_ppl, 
+        "val_step_accuracy": val_step_accuracy, # ADDED
+        "val_epoch_accuracy": val_epoch_accuracy, # ADDED
     }
     with open(output_filename, "w") as f:
         json.dump(metrics_data, f)

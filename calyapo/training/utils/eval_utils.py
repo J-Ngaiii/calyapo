@@ -28,6 +28,19 @@ def compute_accuracy(logits, labels, ignore_index=-100):
     
     return correct, total
 
+def save_prediction_to_rollup(output_dir, local_rank, epoch, step, predictions, targets, tokenizer):
+    """Streams decoded predictions to disk to avoid System RAM OOM."""
+    rollup_path = os.path.join(output_dir, f"kl_rollup_rank_{local_rank}.jsonl")
+    with open(rollup_path, "a") as f:
+        # We only decode the first example in the batch to keep it fast, 
+        # or you can loop through the batch if you need every single sample.
+        decoded_preds = tokenizer.batch_decode(predictions, skip_special_tokens=True)
+        decoded_targets = tokenizer.batch_decode(targets, skip_special_tokens=True)
+        
+        for p, t in zip(decoded_preds, decoded_targets):
+            entry = {"epoch": epoch, "step": step, "model": p.strip(), "human": t.strip()}
+            f.write(json.dumps(entry) + "\n")
+
 def compute_metrics(logits, labels, tokenizer, ignore_index=-100):
     """
     Modular helper for Calyapo-specific metrics.
