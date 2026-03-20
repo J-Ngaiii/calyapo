@@ -16,7 +16,7 @@
 #SBATCH --qos=savio_normal
 
 # Wall clock limit:
-#SBATCH --time=28:00:00
+#SBATCH --time=60:00:00
 
 #SBATCH --output=logs/%j.out
 #SBATCH --error=logs/%j.err
@@ -24,6 +24,7 @@
 # --- Environment Setup ---
 # 1. Create the directory specifically named 'slurm' for the #SBATCH output logs
 mkdir -p slurm
+mkdir -p logs
 
 # 2. Navigate to your project directory
 cd /global/home/users/jonathanngai/calyapo
@@ -57,9 +58,9 @@ DATASET="presidents_to_abortion_dataset"
 MODEL_NAME="meta-llama/Llama-2-7b-hf"
 OUTPUT_DIR="calyapo/training/checkpoints/${DATASET}"
 USE_PEFT=True
-BATCH_SIZE_TRAINING=4
-BATCH_SIZE_VALIDATION=8
-GRADIENT_ACCUMULATION_STEPS=2
+BATCH_SIZE_TRAINING=2
+BATCH_SIZE_VALIDATION=4
+GRADIENT_ACCUMULATION_STEPS=4
 DIST_CHECKPOINT_ROOT_FOLDER="/nas/ucb/jngai/calyapo/training/model_checkpointing"
 DIST_CHECKPOINT_FOLDER="fine-tuned"
 NUM_WORKERS_DATALOADER=2
@@ -122,8 +123,8 @@ torchrun --nnodes=1 \
     --gamma ${GAMMA} \
     --seed 42 \
     --one_gpu ${ONE_GPU} \
-    --use_wandb \
+    --use_wandb True \
     --save_model True \
-    --save_metrics \
+    --save_metrics True \
     --save_optimizer True \
     --low_cpu_mem_usage True

@@ -226,7 +226,7 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
                                 'train/accuracy': step_acc # ADDED
                             })
 
-                    pbar.set_description(f"Training Epoch: {epoch+1}/{train_config.num_epochs}, step {step}/{len(train_dataloader)} completed (loss: {loss.detach().float()})")
+                    pbar.set_description(f"Training Epoch: {epoch+1}/{train_config.num_epochs}, step {step}/{len(train_dataloader)} completed (loss: {loss.detach().float()} / accuracy: {step_acc})")
 
                     if train_config.save_metrics:
                         save_to_json(metrics_filename, train_step_loss, train_loss, train_step_perplexity, train_prep, train_step_accuracy, train_acc, val_step_loss, val_loss, val_step_perplexity, val_prep, val_step_accuracy, val_acc)
@@ -481,7 +481,6 @@ def check_frozen_layers_peft_model(model):
             for name, param in layer.named_parameters():
                 print(f"Layer {i}, parameter {name}: requires_grad = {param.requires_grad}")
 
-
 def setup():
     """Initialize the process group for distributed training"""
     if is_ccl_available():
@@ -630,16 +629,12 @@ def save_train_params(train_config, fsdp_config, rank):
 
 def save_to_json(
         output_filename, 
-        train_step_loss, 
-        train_epoch_loss, 
-        train_step_ppl, 
-        train_epoch_ppl, 
-        train_step_accuracy, 
-        train_epoch_accuracy
-        val_step_loss, 
-        val_epoch_loss, 
-        val_step_ppl, 
-        val_epoch_ppl
+        train_step_loss, train_epoch_loss, 
+        train_step_ppl, train_epoch_ppl, 
+        train_step_accuracy, train_epoch_accuracy, 
+        val_step_loss, val_epoch_loss, 
+        val_step_ppl, val_epoch_ppl, 
+        val_step_accuracy, val_epoch_accuracy, 
     ):
     metrics_data = {
         "train_step_loss": train_step_loss,

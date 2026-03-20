@@ -1,3 +1,5 @@
+import torch
+
 def compute_accuracy(logits, labels, ignore_index=-100):
     """
     Computes accuracy for the non-masked tokens (the completion).
