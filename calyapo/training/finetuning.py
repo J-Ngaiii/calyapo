@@ -88,7 +88,7 @@ def setup_wandb(train_config, fsdp_config, **kwargs):
 def main(**kwargs):
     # Update the configuration for the training and sharding process
     train_config, fsdp_config = TRAIN_CONFIG(), FSDP_CONFIG()
-    update_config((train_config, fsdp_config), **kwargs)
+    update_config((train_config, fsdp_config), **kwargs) # updates default configs with command line args
     # Set the seeds for reproducibility
     if is_xpu_available():
         torch.xpu.manual_seed(train_config.seed)
@@ -174,19 +174,49 @@ def main(**kwargs):
         print(f"--> Using vision model of type '{config.model_type}' ")
     elif config.model_type == "llama":
         is_vision = False
-        model = LlamaForCausalLM.from_pretrained(
-            train_config.model_name,
-            quantization_config=bnb_config,
-            use_cache=use_cache,
-            attn_implementation="sdpa" if train_config.use_fast_kernels else None,
-            device_map=(
-                "auto"
-                if train_config.quantization and not train_config.enable_fsdp
-                else None
-            ),
-            torch_dtype=torch.float16 if train_config.use_fp16 else "auto",
-        )
-        print(f"--> Using language model of type '{config.model_type}' ")
+        # ------ ADDED ------
+        # want to handle for FSDP or multi-GPU setup
+        # add in logic to have non-leading GPU be 'hollow' and not load in entire llama weights
+        if train_config.enable_fsdp and train_config.low_cpu_fsdp: 
+            if rank == 0:
+                print(f"--> Rank 0: Loading model {train_config.model_name}...")
+        # ------ ADDED ------ 
+                model = LlamaForCausalLM.from_pretrained(
+                    train_config.model_name,
+                    quantization_config=bnb_config,
+                    use_cache=use_cache,
+                    attn_implementation="sdpa" if train_config.use_fast_kernels else None,
+                    device_map=(
+                        "auto"
+                        if train_config.quantization and not train_config.enable_fsdp
+                        else None
+                    ),
+                    torch_dtype=torch.float16 if train_config.use_fp16 else "auto",
+                    low_cpu_mem_usage=train_config.low_cpu_mem_usage # ADDED
+                )
+        # ------ ADDED ------ 
+            else:
+                llama_config = AutoConfig.from_pretrained(train_config.model_name)
+                llama_config.use_cache = use_cache
+                with torch.device("meta"):
+                    model = LlamaForCausalLM(llama_config)
+                print(f"--> Rank {rank}: Created meta-device model.")
+        else:
+            # standard loading for non-FSDP or single-GPU runs
+            model = LlamaForCausalLM.from_pretrained(
+                train_config.model_name,
+                quantization_config=bnb_config,
+                use_cache=use_cache,
+                attn_implementation="sdpa" if train_config.use_fast_kernels else None,
+                device_map=(
+                    "auto"
+                    if train_config.quantization and not train_config.enable_fsdp
+                    else None
+                ),
+                torch_dtype=torch.float16 if train_config.use_fp16 else"auto",
+            )
+        # ------ ADDED ------ 
+        print(f"--> Using language model of type '{config.model_type}' ") # shifted down
     else:
         raise ValueError(
             f"Model type {config.model_type} is not supported. Please use llama or mllama model."

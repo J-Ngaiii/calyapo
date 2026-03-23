@@ -24,7 +24,7 @@ from calyapo.training.policies import fpSixteen,bfSixteen, get_llama_wrapper
 from calyapo.training.utils.memory_utils import MemoryTrace
 from accelerate.utils import is_xpu_available, is_ccl_available
 from calyapo.training.utils.flop_utils import FlopMeasure
-from calyapo.training.utils.eval_utils import compute_accuracy, save_prediction_to_rollup
+from calyapo.training.utils.eval_utils import compute_accuracy, # save_prediction_to_rollup
 
 def set_tokenizer_params(tokenizer: LlamaTokenizer):
     tokenizer.pad_token_id = 0
@@ -161,6 +161,7 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
                         outputs = model(**batch)
                         loss = outputs.loss
                         logits = outputs.logits # ADDED
+                        batch_size, seq_length, embed_dim = logits.shape # ADDED NOT USED
 
                     # --- NEW ---
                     # epoch accuracy tracking
@@ -325,11 +326,15 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
                         print(f"best eval loss on epoch {epoch+1} is {best_val_loss}")
             val_loss.append(float(eval_epoch_loss))
             val_prep.append(float(eval_ppl))
+            val_acc.append(float(eval_epoch_accuracy)) # ADDED
         if train_config.enable_fsdp:
             if rank==0:
-                print(f"Epoch {epoch+1}: train_perplexity={train_perplexity:.4f}, train_epoch_loss={train_epoch_loss:.4f}, epoch time {epoch_end_time}s")
+                print(f"--------------- Epoch {epoch+1} ---------------")
+                print(f"train_perplexity={train_perplexity:.4f}, train_epoch_loss={train_epoch_loss:.4f}, train_epoch_accuracy={train_epoch_accuracy:.4f}")
+                print(f"epoch time {epoch_end_time}s")
+                print(f"-----------------------------------------------")
         else:
-            print(f"Epoch {epoch+1}: train_perplexity={train_perplexity:.4f}, train_epoch_loss={train_epoch_loss:.4f}, epoch time {epoch_end_time}s")
+            print(f"Epoch {epoch+1}: train_perplexity={train_perplexity:.4f}, train_epoch_loss={train_epoch_loss:.4f}, train_epoch_accuracy={train_epoch_accuracy:.4f}, epoch time {epoch_end_time}s")
 
         # Saving the results every epoch to plot later
         if train_config.save_metrics:
@@ -339,15 +344,19 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
     avg_checkpoint_time = sum(checkpoint_times)/ len(checkpoint_times) if len(checkpoint_times) > 0 else 0
     avg_train_prep = sum(train_prep)/len(train_prep)
     avg_train_loss = sum(train_loss)/len(train_loss)
+    avg_train_acc = sum(train_acc) / len(train_acc) # ADDED
     if train_config.run_validation:
         avg_eval_prep = sum(val_prep)/len(val_prep)
         avg_eval_loss = sum(val_loss)/len(val_loss)
+        avg_eval_acc = sum(val_acc) / len(val_acc) # ADDED
 
     results['avg_train_prep'] = avg_train_prep
     results['avg_train_loss'] = avg_train_loss
+    results['avg_train_accuracy'] = avg_train_acc # ADDED
     if train_config.run_validation:
         results['avg_eval_prep'] = avg_eval_prep
         results['avg_eval_loss'] = avg_eval_loss
+        results['avg_eval_accuracy'] = avg_eval_acc # ADDED
     results["avg_epoch_time"] = avg_epoch_time
     results["avg_checkpoint_time"] = avg_checkpoint_time
     if train_config.save_metrics:
@@ -406,6 +415,7 @@ def evaluation(model,train_config, eval_dataloader, local_rank, tokenizer, wandb
                 outputs = model(**batch)
                 loss = outputs.loss
                 logits = outputs.logits # ADDED
+                batch_size, seq_length, embed_dim = logits.shape # ADDED NOT USED 
                 if train_config.save_metrics:
                     val_step_loss.append(loss.detach().float().item())
                     val_step_perplexity.append(float(torch.exp(loss.detach().float())))
@@ -454,7 +464,7 @@ def evaluation(model,train_config, eval_dataloader, local_rank, tokenizer, wandb
         wandb_run.log({
                         'eval/perplexity': eval_ppl,
                         'eval/loss': eval_epoch_loss,
-                        'epoch/accuracy': eval_epoch_accuracy
+                        'eval/accuracy': eval_epoch_accuracy # ADDED
                     }, commit=False)
 
     return eval_ppl, eval_epoch_loss, val_step_loss, val_step_perplexity, val_step_accuracy, eval_epoch_accuracy # ADDED

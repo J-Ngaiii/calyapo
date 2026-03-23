@@ -63,7 +63,7 @@ BATCH_SIZE_VALIDATION=4
 GRADIENT_ACCUMULATION_STEPS=4
 DIST_CHECKPOINT_ROOT_FOLDER="/nas/ucb/jngai/calyapo/training/model_checkpointing"
 DIST_CHECKPOINT_FOLDER="fine-tuned"
-NUM_WORKERS_DATALOADER=2
+NUM_WORKERS_DATALOADER=4
 ONE_GPU=False
 WEIGHT_DECAY=0.1
 GAMMA=0.85
@@ -95,7 +95,7 @@ torchrun --nnodes=1 \
     --nproc-per-node=${NPROC_PER_NODE} \
     --master_port=${MASTER_PORT} \
     scripts/experiment/run_finetune.py \
-    --enable_fsdp False \
+    --enable_fsdp True \
     --low_cpu_fsdp False \
     --fsdp_config.pure_bf16 False \
     --use_peft=${USE_PEFT} \
@@ -113,7 +113,6 @@ torchrun --nnodes=1 \
     --batching_strategy='padding' \
     --dataset ${DATASET} \
     --output_dir ${OUTPUT_DIR} \
-    --dataset_path ${DATASET_PATH} \
     --model_name ${MODEL_NAME} \
     --model_nickname ${MODEL_NICKNAME} \
     --num_workers_dataloader ${NUM_WORKERS_DATALOADER} \
