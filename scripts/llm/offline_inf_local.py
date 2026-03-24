@@ -64,7 +64,7 @@ if __name__ == "__main__":
         "quantization": "bitsandbytes",
         "load_format": "bitsandbytes",
         "dtype": "float16",
-        "max_model_len": 512, # prompts are not that long
+        "max_model_len": 256, # prompts are not that long
         "max_num_seqs": 128,
         "gpu_memory_utilization": 0.85,
         "enforce_eager": True,
@@ -74,7 +74,7 @@ if __name__ == "__main__":
 
     sampling_config = {
         "temperature": 0,
-        "max_tokens": 3, # only need to generate one response (A, B, C or D) but give some flexibility
+        "max_tokens": 2, # only need to generate one response (A, B, C or D) but give some flexibility
         "logprobs": 5 
     }
 
