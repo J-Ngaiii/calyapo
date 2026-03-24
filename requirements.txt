@@ -33,3 +33,4 @@ pyreadstat==1.1.2
 vllm==0.7.2
 wandb==0.19.6
 ipykernel
+openai

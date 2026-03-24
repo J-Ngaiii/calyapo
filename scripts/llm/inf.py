@@ -3,23 +3,24 @@ import json
 import os
 from openai import AsyncOpenAI
 from pathlib import Path
-
+from tqdm.asyncio import tqdm
 from calyapo.configurations.config import UNIVERSAL_FINAL_FOLDER
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 
-# 1. Configuration
-MODEL_NAME = "meta-llama/Llama-2-7b-chat-hf" 
+# configuration
+MODEL_NAME = "meta-llama/Llama-2-7b-hf" 
 DATASET = "presidents_to_abortion"
 DATA_FILES = {
     "train": Path(UNIVERSAL_FINAL_FOLDER / f"{DATASET}_train.jsonl") ,
     "val": Path(UNIVERSAL_FINAL_FOLDER / f"{DATASET}_val.jsonl")
 }
 
-# Limit concurrent requests to avoid memory/network issues
+# limit concurrent requests to avoid memory/network issues
 CONCURRENCY_LIMIT = 50
 semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
 
+# empty key is correct based on https://docs.vllm.ai/en/latest/examples/online_serving/openai_chat_completion_client_with_tools/
 client = AsyncOpenAI(
     api_key="EMPTY",
     base_url="http://localhost:8000/v1",
@@ -34,18 +35,18 @@ async def get_prediction(datapoint, i):
             # We strip the completion to handle leading spaces like " D"
             true_label = datapoint.get("completion", "").strip()
 
-            response = await client.chat.completions.create(
+            # change to just call client.completions rather than client.chats.completion since not using chat model
+            response = await client.completions.create(
                 model=MODEL_NAME,
-                messages=[
-                    {"role": "user", "content": user_prompt}
-                ],
+                prompt=user_prompt, # Pass the string directly
                 temperature=0,
-                max_tokens=5, # We only need the letter (A, B, C, D, E)
-                logprobs=True,
-                top_logprobs=5
+                max_tokens=5, 
+                logprobs=5 # Note: In Completions API, this is an integer, not a boolean
             )
-            
-            prediction = response.choices[0].message.content.strip()
+
+            # access prediction via .text not .message
+            prediction = response.choices[0].text.strip()
+            # prediction = response.choices[0].message.content.strip()
             
             # Simple check: does the prediction start with the correct letter?
             is_correct = prediction.startswith(true_label)
@@ -62,12 +63,11 @@ async def get_prediction(datapoint, i):
             return None
 
 async def process_file(file_path, split_name):
-    """Reads JSONL line-by-line and runs inference."""
+    """Reads JSONL and runs inference with progress tracking."""
     if not os.path.exists(file_path):
         print(f"File not found: {file_path}")
         return
 
-    # Load JSONL
     data = []
     with open(file_path, 'r') as f:
         for line in f:
@@ -76,20 +76,25 @@ async def process_file(file_path, split_name):
 
     print(f"Processing {split_name} ({len(data)} items)...")
     
-    tasks = [get_prediction(item, i) for i, item in enumerate(data)]
-    results = await asyncio.gather(*tasks)
-    results = [r for r in results if r is not None]
+    output_path = f"results_{split_name}.jsonl"
+    results = []
 
-    # Calculate Stats
+    # Wrap your tasks in tqdm to see a progress bar
+    tasks = [get_prediction(item, i) for i, item in enumerate(data)]
+    
+    with open(output_path, "w") as f:
+        # as_completed allows us to handle results as they finish
+        for task in tqdm(asyncio.as_completed(tasks), total=len(tasks), desc=split_name):
+            result = await task
+            if result:
+                results.append(result)
+                # Save incrementally so you don't lose progress
+                f.write(json.dumps(result) + "\n")
+                f.flush() 
+
     correct = sum(1 for r in results if r["is_correct"])
     accuracy = (correct / len(results)) * 100 if results else 0
-    print(f"Done {split_name}. Accuracy: {accuracy:.2f}%")
-
-    # Save output for KL roll-up
-    output_path = f"results_{split_name}.jsonl"
-    with open(output_path, "w") as f:
-        for entry in results:
-            f.write(json.dumps(entry) + "\n")
+    print(f"\nDone {split_name}. Accuracy: {accuracy:.2f}%")
 
 async def main():
     for split, path in DATA_FILES.items():
