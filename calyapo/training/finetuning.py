@@ -191,7 +191,7 @@ def main(**kwargs):
                         if train_config.quantization and not train_config.enable_fsdp
                         else None
                     ),
-                    torch_dtype=torch.float16 if train_config.use_fp16 else "auto",
+                    torch_dtype=torch.float16 if train_config.use_fp16 else "auto", 
                     low_cpu_mem_usage=train_config.low_cpu_mem_usage # ADDED
                 )
         # ------ ADDED ------ 

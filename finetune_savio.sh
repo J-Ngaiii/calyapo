@@ -69,16 +69,24 @@ WEIGHT_DECAY=0.1
 GAMMA=0.85
 LR=1e-5
 NUM_EPOCHS=3
-DATASET_PATH="calyapo/training/datasets"
 MODEL_NICKNAME="llama7b"
+ENABLE_FSDP=True
+LOW_CPU_FSDP=True
+LOW_CPU_MEM_USAGE=True
 
 print_header() {
     echo "------------------------------------------------"
     echo "Starting Calyapo Finetuning Job"
-    echo "Date:       $(date)"
-    echo "Dataset:    ${DATASET}"
-    echo "Model:      ${MODEL_NAME}"
-    echo "Output:     ${OUTPUT_DIR}"
+    echo "Date:               $(date)"
+    echo "Dataset:            ${DATASET}"
+    echo "Model:              ${MODEL_NAME}"
+    echo "Output:             ${OUTPUT_DIR}"
+    echo ""
+    echo "Distributed Computing Checks"
+    echo "FSDP:               ${ENABLE_FSDP}"
+    echo "Low CPU FSDP:       ${LOW_CPU_FSDP}"
+    echo "Low CPU Memory:     ${LOW_CPU_FSDP}"
+    echo "One GPU:            ${ONE_GPU}"
     echo "------------------------------------------------"
 }
 
@@ -89,14 +97,14 @@ print_header
 # DISABLE FSDP FOR DEBUGGING
 # 1080 cannot handle --fsdp_config.pure_bf16
 
-export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+# export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 torchrun --nnodes=1 \
     --nproc-per-node=${NPROC_PER_NODE} \
     --master_port=${MASTER_PORT} \
     scripts/experiment/run_finetune.py \
-    --enable_fsdp True \
-    --low_cpu_fsdp False \
+    --enable_fsdp ${ENABLE_FSDP} \
+    --low_cpu_fsdp ${LOW_CPU_FSDP} \
     --fsdp_config.pure_bf16 False \
     --use_peft=${USE_PEFT} \
     --quantization "4bit" \

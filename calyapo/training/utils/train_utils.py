@@ -24,7 +24,7 @@ from calyapo.training.policies import fpSixteen,bfSixteen, get_llama_wrapper
 from calyapo.training.utils.memory_utils import MemoryTrace
 from accelerate.utils import is_xpu_available, is_ccl_available
 from calyapo.training.utils.flop_utils import FlopMeasure
-from calyapo.training.utils.eval_utils import compute_accuracy, # save_prediction_to_rollup
+from calyapo.training.utils.eval_utils import compute_accuracy
 
 def set_tokenizer_params(tokenizer: LlamaTokenizer):
     tokenizer.pad_token_id = 0
