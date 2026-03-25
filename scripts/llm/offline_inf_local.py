@@ -47,6 +47,7 @@ def main(engine_params, sampling_params, input_path, output_folder, lora_path = 
         print(f"max_model_len:           {engine_params.get('max_model_len', None)}")
         print(f"max_num_seqs:            {engine_params.get('max_num_seqs', None)}")
         print(f"gpu_memory_utilization:  {engine_params.get('gpu_memory_utilization', None)}")
+        print(f"LoRA enabled:            {engine_params.get('enable_lora', None)}")
         print(f"seed:                    {engine_params.get('seed', None)}")
         print(f"--------------------------------------------------------------")
 
@@ -101,35 +102,22 @@ def main(engine_params, sampling_params, input_path, output_folder, lora_path = 
     print(f"Results saved to: {results_file}")
 
 if __name__ == "__main__":
-    USE_LORA = False
+    USE_LORA = True
 
     basic_inf_engine_config = {
         "model": "meta-llama/Llama-2-7b-hf",
         "quantization": "bitsandbytes",
         "load_format": "bitsandbytes",
         "dtype": "float16",
-        "max_model_len": 256, # prompts are not that long
-        "max_num_seqs": 128,
+        "max_model_len": 212, # prompts are not that long
+        "max_num_seqs": 96,
         "gpu_memory_utilization": 0.85,
         "enforce_eager": True,
         "trust_remote_code": True, 
         "seed": 42
     }
 
-    lora_inf_engine_config = {
-        "model": "meta-llama/Llama-2-7b-hf",
-        "quantization": "bitsandbytes",
-        "load_format": "bitsandbytes",
-        "dtype": "float16",
-        "max_model_len": 256, # prompts are not that long
-        "max_num_seqs": 128,
-        "gpu_memory_utilization": 0.85,
-        "enforce_eager": True,
-        "trust_remote_code": True, 
-        "seed": 42, 
-        "enable_lora": True, 
-        "max_loras": 1
-    }
+    lora_inf_engine_config = {**basic_inf_engine_config, "enable_lora": True, "max_loras": 1}
 
     sampling_config = {
         "temperature": 0,
