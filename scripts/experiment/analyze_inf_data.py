@@ -2,10 +2,58 @@ import json
 from pathlib import Path
 
 OUTPUT_FOLDER = Path("inference_outputs")
-RESULTS_PATH = OUTPUT_FOLDER / "results_20260324_222337.jsonl"
-CONFIG_PATH = OUTPUT_FOLDER / "config_20260324_222337.json"
+P2A_PATHS = {
+    'train' : {
+        'lora' : {
+            'results' : "results_train_p2a_lora_20260324_222337.jsonl", 
+            'config' : "config_train_p2a_lora_20260324_222337.json"
+        }, 
+        'base' : {
+            'results' : "results_train_p2a_base_20260324_171048.jsonl", 
+            'config' : "config_train_p2a_base_20260324_171048.json"
+        }, 
+    }, 
+    'val' : {
+        'lora' : {
+            'results' : "results_validation_p2a_lora_20260325_084809.jsonl", 
+            'config' : "config_validation_p2a_lora_20260325_084809.json"
+        }, 
+        'base' : {
+            'results' : "results_validation_p2a_base_20260325_083628.jsonl", 
+            'config' : "config_validation_p2a_base_20260325_083628.json"
+        }, 
+    }
+}
+PATH_CONFIG = {
+    'presidents_to_abortion' : P2A_PATHS
+}
 
-def main(results_path, config_path, verbose=False):
+def get_path(train_plan, verbose=False):
+    if train_plan not in PATH_CONFIG:
+        raise ValueError(f"inputted training plan '{train_plan}' not in path config, choose from: {PATH_CONFIG.keys()}")
+    
+    train_plan_conf = PATH_CONFIG[train_plan]
+    out = {
+        'train_lora' : {
+            'results_path' : OUTPUT_FOLDER / Path(str(train_plan)) / train_plan_conf['train']['lora']['results'], 
+            'config_path' : OUTPUT_FOLDER / Path(str(train_plan)) / train_plan_conf['train']['lora']['config']
+        }, 
+        'train_base' : {
+            'results_path' : OUTPUT_FOLDER / Path(str(train_plan)) / train_plan_conf['train']['base']['results'], 
+            'config_path' : OUTPUT_FOLDER / Path(str(train_plan)) / train_plan_conf['train']['base']['config']
+        }, 
+        'val_lora' : {
+            'results_path' : OUTPUT_FOLDER / Path(str(train_plan)) / train_plan_conf['val']['lora']['results'], 
+            'config_path' : OUTPUT_FOLDER / Path(str(train_plan)) / train_plan_conf['val']['lora']['config']
+        }, 
+        'val_base' : {
+            'results_path' : OUTPUT_FOLDER / Path(str(train_plan)) / train_plan_conf['val']['base']['results'], 
+            'config_path' : OUTPUT_FOLDER / Path(str(train_plan)) / train_plan_conf['val']['base']['config']
+        }, 
+    }
+    return out
+
+def calculate_accuracy(results_path, config_path, verbose=False):
     if verbose:
         with open(config_path, 'r', encoding='utf-8') as f:
             config_data = json.load(f)
@@ -45,5 +93,12 @@ def main(results_path, config_path, verbose=False):
         print(f"Accuracy: {acc}")
     return acc
 
+def main(train_plan, verbose = False):
+    splits_conf = get_path(train_plan, verbose=verbose)
+    for k, v in splits_conf.items():
+        print(f"Processing {k}...")
+        calculate_accuracy(**v, verbose=verbose)
+
 if __name__ == "__main__":
-    main(RESULTS_PATH, CONFIG_PATH, verbose=True)
+    tp = 'presidents_to_abortion'
+    main(tp, verbose=True)

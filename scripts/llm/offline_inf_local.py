@@ -113,7 +113,7 @@ def run_inference(engine_params, sampling_params, split, train_plan, input_path,
     print(f"Results saved to: {results_file}")
 
 if __name__ == "__main__":
-    USE_LORA = False
+    USE_LORA = True
     USE_VAL = True
 
     basic_inf_engine_config = {
