@@ -45,9 +45,11 @@ def run_inference(engine_params, sampling_params, split, train_plan, input_path,
 
     if verbose: 
         model_name = engine_params.get('model', 'Unknown')
+        print(f"\n------------------------Dataset Stats------------------------")
         print(f"Dataset:                 {split}")
         print(f"Training Plan:           {train_plan}")
         print(f"Plan using Abbreviation: {TP_ABBREVIATIONS.get(train_plan, 'no abbreviations found')}")
+        print(f"-------------------------------------------------------------")
         
         print(f"\n------------------------Engine Stats------------------------")
         print(f"Initializing vLLM engine for model: '{model_name}'")
@@ -57,13 +59,13 @@ def run_inference(engine_params, sampling_params, split, train_plan, input_path,
         print(f"gpu_memory_utilization:  {engine_params.get('gpu_memory_utilization', None)}")
         print(f"LoRA enabled:            {engine_params.get('enable_lora', None)}")
         print(f"seed:                    {engine_params.get('seed', None)}")
-        print(f"--------------------------------------------------------------")
+        print(f"-------------------------------------------------------------")
 
-        print(f"\n---------------Sampler Stats---------------")
+        print(f"\n------------------------Sampler Stats------------------------")
         print(f"temperature:             {sampling_params.get('temperature', None)}")
         print(f"max_tokens:              {sampling_params.get('max_tokens', None)}")
         print(f"logprobs:                {sampling_params.get('logprobs', None)}")
-        print(f"--------------------------------------------")
+        print(f"-------------------------------------------------------------")
     llm = LLM(**engine_params)
 
     vllm_sampling_config = SamplingParams(**sampling_params)
