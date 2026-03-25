@@ -7,10 +7,15 @@ import os
 from datetime import datetime
 
 # --- Configuration ---
-DATASET_PATH = Path("calyapo/data/final/presidents_to_abortion_train.jsonl")
-OUTPUT_FOLDER = Path("inference_outputs")
-OUTPUT_PATH = OUTPUT_FOLDER / "results_train_offline.jsonl"
-LORA_ADAPTER_PATH = Path("calyapo/training/checkpoints/presidents_to_abortion_dataset")
+TRAIN_PLAN = "presidents_to_abortion"
+TRAIN_PATH = Path(f"calyapo/data/final/{TRAIN_PLAN}_train.jsonl")
+VAL_PATH = Path(f"calyapo/data/final/{TRAIN_PLAN}_val.jsonl")
+OUTPUT_FOLDER = Path(f"inference_outputs/{TRAIN_PLAN}")
+LORA_ADAPTER_PATH = Path(f"calyapo/training/checkpoints/{TRAIN_PLAN}_dataset")
+
+TP_ABBREVIATIONS = {
+        "presidents_to_abortion" : "p2a"
+    }
 
 def get_timestamp():
     """Returns current time as a string: YYYYMMDD_HHMMSS"""
@@ -27,7 +32,7 @@ def load_data(file_path):
                 data.append(json.loads(line))
     return data
 
-def main(engine_params, sampling_params, input_path, output_folder, lora_path = None, verbose=False):
+def run_inference(engine_params, sampling_params, split, train_plan, input_path, output_folder, lora_path = None, verbose=False):
     if not os.path.exists(input_path):
         raise ValueError(f"Input path '{input_path}' does not exist")
 
@@ -40,7 +45,10 @@ def main(engine_params, sampling_params, input_path, output_folder, lora_path = 
 
     if verbose: 
         model_name = engine_params.get('model', 'Unknown')
-        quant = engine_params.get('quantization', 'None')
+        print(f"Dataset:                 {split}")
+        print(f"Training Plan:           {train_plan}")
+        print(f"Plan using Abbreviation: {TP_ABBREVIATIONS.get(train_plan, 'no abbreviations found')}")
+        
         print(f"\n------------------------Engine Stats------------------------")
         print(f"Initializing vLLM engine for model: '{model_name}'")
         print(f"quantization:            {engine_params.get('quantization', None)}")
@@ -71,8 +79,9 @@ def main(engine_params, sampling_params, input_path, output_folder, lora_path = 
         outputs = llm.generate(prompts, vllm_sampling_config)
 
     ts = get_timestamp()
-    results_file = output_folder / f"results_{ts}.jsonl"
-    config_file = output_folder / f"config_{ts}.json"
+    model_type = "lora" if engine_params.get('enable_lora', False) else "base"
+    results_file = output_folder / f"results_{split}_{TP_ABBREVIATIONS[train_plan]}_{model_type}_{ts}.jsonl"
+    config_file = output_folder / f"config_{split}_{TP_ABBREVIATIONS[train_plan]}_{model_type}_{ts}.json"
     full_config = {
         "timestamp": ts,
         "engine_params": engine_params,
@@ -102,7 +111,8 @@ def main(engine_params, sampling_params, input_path, output_folder, lora_path = 
     print(f"Results saved to: {results_file}")
 
 if __name__ == "__main__":
-    USE_LORA = True
+    USE_LORA = False
+    USE_VAL = True
 
     basic_inf_engine_config = {
         "model": "meta-llama/Llama-2-7b-hf",
@@ -132,5 +142,22 @@ if __name__ == "__main__":
         engine_config = basic_inf_engine_config
         lora_path = None
 
+    if USE_VAL:
+        inf_split = "validation"
+        input_path = VAL_PATH
+    else:
+        inf_split = "training"
+        input_path = TRAIN_PATH
+
     OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
-    main(engine_config, sampling_config, DATASET_PATH, OUTPUT_FOLDER, lora_path=lora_path, verbose=True)
+
+    run_inference(
+        engine_params=engine_config, 
+        sampling_params=sampling_config, 
+        split=inf_split, 
+        train_plan='presidents_to_abortion', 
+        input_path=input_path,
+        output_folder=OUTPUT_FOLDER, 
+        lora_path=lora_path, 
+        verbose=True
+    )

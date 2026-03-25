@@ -2,8 +2,8 @@ import json
 from pathlib import Path
 
 OUTPUT_FOLDER = Path("inference_outputs")
-RESULTS_PATH = OUTPUT_FOLDER / "results_20260324_171048.jsonl"
-CONFIG_PATH = OUTPUT_FOLDER / "config_20260324_171048.json"
+RESULTS_PATH = OUTPUT_FOLDER / "results_20260324_222337.jsonl"
+CONFIG_PATH = OUTPUT_FOLDER / "config_20260324_222337.json"
 
 def main(results_path, config_path, verbose=False):
     if verbose:
@@ -18,6 +18,7 @@ def main(results_path, config_path, verbose=False):
         print(f"max_model_len:           {engine_params.get('max_model_len', None)}")
         print(f"max_num_seqs:            {engine_params.get('max_num_seqs', None)}")
         print(f"gpu_memory_utilization:  {engine_params.get('gpu_memory_utilization', None)}")
+        print(f"LoRA Enabled:            {engine_params.get('enable_lora', None)}")
         print(f"seed:                    {engine_params.get('seed', None)}")
         print(f"--------------------------------------------------------------")
 
