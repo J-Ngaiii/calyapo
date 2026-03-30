@@ -53,14 +53,13 @@ def get_path(train_plan, verbose=False):
     }
     return out
 
-def calculate_accuracy(results_path, config_path, verbose=False):
+def calculate_accuracy(results_path, config_path, bootstrap=False, verbose=False):
     if verbose:
         with open(config_path, 'r', encoding='utf-8') as f:
             config_data = json.load(f)
         
         engine_params = config_data['engine_params']
         sampling_params = config_data['sampling_params']
-        print(f"Calculating Accuracy for model with following configs:")
         print(f"model:                   {engine_params.get('model', None)}")
         print(f"quantization:            {engine_params.get('quantization', None)}")
         print(f"max_model_len:           {engine_params.get('max_model_len', None)}")
@@ -68,16 +67,15 @@ def calculate_accuracy(results_path, config_path, verbose=False):
         print(f"gpu_memory_utilization:  {engine_params.get('gpu_memory_utilization', None)}")
         print(f"LoRA Enabled:            {engine_params.get('enable_lora', None)}")
         print(f"seed:                    {engine_params.get('seed', None)}")
-        print(f"--------------------------------------------------------------")
 
-        print(f"\n---------------Sampler Stats---------------")
         print(f"temperature:             {sampling_params.get('temperature', None)}")
         print(f"max_tokens:              {sampling_params.get('max_tokens', None)}")
         print(f"logprobs:                {sampling_params.get('logprobs', None)}")
-        print(f"--------------------------------------------")
+        print(f"----------------------------------------------")
     
     num_correct = 0
     num_datapoints = 0
+    data = []
     with open(results_path, 'r', encoding='utf-8') as f:
         for line in f:
             line = line.strip()
@@ -86,17 +84,21 @@ def calculate_accuracy(results_path, config_path, verbose=False):
                 num_datapoints += 1
                 pred_correct = int(json_obj['is_correct'])
                 num_correct += pred_correct
+                data.append(json_obj)
     
     acc = num_correct / num_datapoints
+    # calculate confidence interval
     if verbose: 
+        print(f"\n----------------------- Metrics -----------------------")
         print(f"Total number of datapoints loaded in: {num_datapoints}")
         print(f"Accuracy: {acc}")
+        print(f"---------------------------------------------------------")
     return acc
 
 def main(train_plan, verbose = False):
     splits_conf = get_path(train_plan, verbose=verbose)
     for k, v in splits_conf.items():
-        print(f"Processing {k}...")
+        print(f"-------------- Processing Split '{k}' --------------\n")
         calculate_accuracy(**v, verbose=verbose)
 
 if __name__ == "__main__":

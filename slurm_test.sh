@@ -22,7 +22,7 @@
 #
 #Number of GPUs, this should generally be in the form "gpu:A5000:[1-4] with the type included
 #SBATCH --gres=gpu:1
-##SBATCH --qos=a40_gpu3_normal
+#SBATCH --qos=a40_gpu3_normal
 #
 # Wall clock limit:
 #SBATCH --time=00:10:00
