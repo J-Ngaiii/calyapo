@@ -99,7 +99,7 @@ TRAIN_PLANS = {
             'valid_indiv_setting' : 'any', 
             'reduction_modifier' : 0.1
         }, 
-    'option_school' : {
+    'opinion_school' : {
             'variable_map': OPINION_SCHOOL, 
             'homogenous_var_plan' : True, 
             'datasets' : set(['IGS']), 

@@ -137,6 +137,7 @@ class Individual:
             raise ValueError(f"Unknown dataset {dataset_name} in ALL_DATA_MAPS")
         
         self.id = idx
+        self.uniqueid = f"{idx}-{time_period}"
         self.time_period = time_period
         self.dataset_name = dataset_name
         self.train_plan = train_plan # tracked for metadata only
@@ -158,6 +159,13 @@ class Individual:
                                 "var_label2qst_option": {}
                             }, 
                         }
+        self.indiv_map_base = {
+                "id" : self.id, # default to row index, can use igs id or can just not
+                "uniqueid" : self.uniqueid
+                "time" : self.time_period, 
+                "demog" : self.demog,
+                "dataset" : self.dataset_name,  
+            }
         
         self.na_filler = na_filler
         
@@ -310,7 +318,7 @@ class Individual:
             return self.return_test_indiv_map()
 
     def return_full_indiv_map(self):
-        entry = {
+        entry = self.indiv_map_base{
                 "id" : self.id, # default to row index, can use igs id or can just not
                 "time" : self.time_period, 
                 "demog" : self.demog,
