@@ -31,6 +31,20 @@ from torch.distributed.fsdp.fully_sharded_data_parallel import StateDictType
 import torch.distributed._shard.checkpoint as dist_cp
 import torch.distributed as dist
 
+# ------ ADDED ------
+def generate_timestamped_folder(cfg) -> Path:
+    """
+    Constructs a path like: root/wd0.1_gam0.85_lr1e-5_2026-03-29-08:31:12_PM
+    """
+    timestamp = datetime.now().strftime("%Y-%m-%d-%I:%M:%S_%p")
+    folder_name = (
+        f"wd{cfg.weight_decay}_"
+        f"gam{cfg.gamma}_"
+        f"lr{cfg.lr}_"
+        f"{timestamp}"
+    )
+    return Path(folder_name)
+# ------ ADDED ------
 
 def get_date_of_run():
     """create date and time for file save uniqueness

@@ -47,11 +47,18 @@ PREZ_ABORTION =  {
     'test_resp' : ['oppose_abortion_senate', 'defend_abortion_senate']
 } # simulate low information voter that doesn't have policy stances
 
+OPINION_SCHOOL = {
+    'demo' : ['age', 'partyid', 'ideology', 'race', 'gender', 'sex', 'env_urban', 'marital'], 
+    'train_resp' : ['trump_opinion', 'biden_opinion', 'harris_opinion'], 
+    'val_resp' : ['trump_opinion', 'biden_opinion', 'harris_opinion'], 
+    'test_resp' : ['trump_opinion', 'biden_opinion', 'harris_opinion']
+}
+
 TEST_PLAN = {
     'demo' : ['age', 'partyid', 'ideology', 'race', 'gender', 'sex', 'env_urban', 'marital'], 
     'train_resp' : ['trump_opinion', 'biden_opinion'], 
-    'val_resp' : ['oppose_immigration_senate', 'harris_opinion'], 
-    'test_resp' : ['oppose_immigration_senate', 'harris_opinion']
+    'val_resp' : ['oppose_immigration_senate'], 
+    'test_resp' : ['oppose_immigration_senate']
 }
 
 
@@ -83,12 +90,21 @@ TRAIN_PLANS = {
             'train_setting' : 2, 
             'valid_indiv_setting' : 'any'
         }, 
-    'TEST_PLAN' : {
+    'test_plan' : {
             'variable_map': TEST_PLAN, 
             'homogenous_var_plan' : False, 
             'datasets' : set(['IGS']), 
             'question_varies_by_split' : True, # of course will be true
             'train_setting' : 2, 
+            'valid_indiv_setting' : 'any', 
+            'reduction_modifier' : 0.1
+        }, 
+    'option_school' : {
+            'variable_map': OPINION_SCHOOL, 
+            'homogenous_var_plan' : True, 
+            'datasets' : set(['IGS']), 
+            'question_varies_by_split' : False,
+            'train_setting' : 1, 
             'valid_indiv_setting' : 'any'
-        }
+        }, 
 }

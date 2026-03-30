@@ -19,6 +19,7 @@ DATASET_PREPROC = {
     "ideology_to_trump_dataset": get_calyapo_dataset, 
     "ideology_to_ideology_dataset": get_calyapo_dataset,
     "presidents_to_abortion_dataset": get_calyapo_dataset,
+    "test_plan_dataset" : get_calyapo_dataset
 }
 DATALOADER_COLLATE_FUNC = {
     "custom_dataset": get_data_collator
