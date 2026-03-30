@@ -28,6 +28,7 @@ class SplitHandler:
         self.valid_indiv_setting = self.plan_config.get('valid_indiv_setting', None)
         self.ques_split_varying = self.plan_config['question_varies_by_split']
         self.datasets = self.plan_config['datasets']
+        self.reduction_modifier = self.plan_config.get('reduction_modifier', None)
         
         self.training_ratios = {
             'train' : float(train_ratio), 
@@ -63,7 +64,7 @@ class SplitHandler:
             if verbose: print(f"(Split Handler | Splitting) Processing {len(interim_data)} DataFrames passed in-memory.")
         
         out_path = DATA_PATHS[dataset_name]['processed']
-        out_pack = split_questions(data=interim_data, dataset_name=dataset_name, train_plan=self.train_plan, out_path=out_path, save=save, debug=debug, verbose=verbose)
+        out_pack = split_questions(data=interim_data, dataset_name=dataset_name, train_plan=self.train_plan, reduction_modifier=self.reduction_modifier, out_path=out_path, save=save, debug=debug, verbose=verbose)
         # split on questions compiles data from all time periods per dataset
         # train plan is written onto out_pack
         return out_pack

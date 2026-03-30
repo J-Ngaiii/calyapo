@@ -70,8 +70,8 @@ GAMMA=0.85
 LR=1e-5
 NUM_EPOCHS=3
 MODEL_NICKNAME="llama7b"
-ENABLE_FSDP=True
-LOW_CPU_FSDP=True
+ENABLE_FSDP=False
+LOW_CPU_FSDP=False
 LOW_CPU_MEM_USAGE=True
 
 print_header() {
@@ -85,7 +85,7 @@ print_header() {
     echo "Distributed Computing Checks"
     echo "FSDP:               ${ENABLE_FSDP}"
     echo "Low CPU FSDP:       ${LOW_CPU_FSDP}"
-    echo "Low CPU Memory:     ${LOW_CPU_FSDP}"
+    echo "Low CPU Memory:     ${LOW_CPU_MEM_USAGE}"
     echo "One GPU:            ${ONE_GPU}"
     echo "------------------------------------------------"
 }

@@ -1,14 +1,16 @@
 import json
 import pandas as pd
+import numpy as np
 from pathlib import Path
 from typing import List, Dict, Union
+import math
 
 from calyapo.configurations.data_map_config import ALL_DATA_MAPS
 from calyapo.configurations.config import DATA_PATHS, UNIVERSAL_NA_FILLER
 from calyapo.data_preprocessing.cleaning_objects import Individual, TrainPlanWrapper, DataPackage
 from calyapo.utils.persistence import *
 
-def process_csv(data: pd.DataFrame, dataset_name: str, train_plan: str, debug: bool = False, verbose: bool = False) -> DataPackage:
+def process_csv(data: pd.DataFrame, dataset_name: str, train_plan: str, reduction_modifier: float = None, debug: bool = False, verbose: bool = False) -> DataPackage:
     """
     Process a single CSV file or dataframe and return a DataPackage.
     """
@@ -74,12 +76,21 @@ def process_csv(data: pd.DataFrame, dataset_name: str, train_plan: str, debug: b
         val_data.append(entry.return_split_indiv_map('val'))
         test_data.append(entry.return_split_indiv_map('test'))
 
+    if verbose: print(f"(process_csv) finished processing single df, initial dataset size: '{len(cleaned_data)}'")
     # all are the same length due to missing val handling in Individual class
     pack = DataPackage(
         dataset_name=dataset_name, 
         train_plan=train_plan, 
         time_period=time_period,
     )
+
+    if reduction_modifier is not None:
+        cleaned_data = list(np.random.choice(cleaned_data, size=math.floor(len(cleaned_data) * reduction_modifier), replace=False))
+        train_data = list(np.random.choice(train_data, size=math.floor(len(train_data) * reduction_modifier), replace=False))
+        val_data = list(np.random.choice(val_data, size=math.floor(len(val_data) * reduction_modifier), replace=False))
+        test_data = list(np.random.choice(test_data, size=math.floor(len(test_data) * reduction_modifier), replace=False))
+        if verbose: print(f"(process_csv) reduction modifier '{reduction_modifier}' active, new dataset size: '{len(cleaned_data)}'")
+
     pack.add_data('full', cleaned_data)
     pack.add_data('train', train_data)
     pack.add_data('val', val_data)
@@ -94,6 +105,7 @@ def split_questions(
         data: List[pd.DataFrame], 
         dataset_name: str, 
         train_plan: str, 
+        reduction_modifier: float = None, 
         out_path: str = None, 
         save: bool = True, 
         debug: bool = False, 
@@ -112,7 +124,7 @@ def split_questions(
     if verbose: print(f"(split_question) recieving '{len(data)}' dataframes")
 
     for df in data:
-        pack = process_csv(data=df, dataset_name=dataset_name, train_plan=train_plan, debug=debug, verbose=verbose)
+        pack = process_csv(data=df, dataset_name=dataset_name, train_plan=train_plan, reduction_modifier=reduction_modifier, debug=debug, verbose=verbose)
 
         
         if not pack: continue # skip if config missing

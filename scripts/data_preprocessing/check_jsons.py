@@ -22,4 +22,4 @@ def direct_check_json(train_plan):
     return results
 
 if __name__ == "__main__":
-    direct_check_json('presidents_to_abortion')
+    direct_check_json('TEST_PLAN')

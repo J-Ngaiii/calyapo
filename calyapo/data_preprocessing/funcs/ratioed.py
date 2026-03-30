@@ -110,6 +110,7 @@ def split_ratio(
         outPack['train'] = [all_valid_indivs[i] for i in indices[:train_end]]
         outPack['val'] = [all_valid_indivs[i] for i in indices[train_end:val_end]]
         outPack['test'] = [all_valid_indivs[i] for i in indices[val_end:]]
+        
     elif train_setting == 2:
         if debug:
             print(f"(split_ratio| Debug) Train Setting 2: New question, same individual processing active")

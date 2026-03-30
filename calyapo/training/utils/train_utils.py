@@ -19,7 +19,7 @@ from transformers import LlamaTokenizer
 import json
 
 
-from calyapo.training.model_checkpointing import save_fsdp_model_checkpoint_full, save_model_and_optimizer_sharded, save_optimizer_checkpoint, save_peft_checkpoint, save_model_checkpoint
+from calyapo.training.model_checkpointing import save_fsdp_model_checkpoint_full, save_model_and_optimizer_sharded, save_optimizer_checkpoint, save_peft_checkpoint, save_model_checkpoint, generate_timestamped_folder
 from calyapo.training.policies import fpSixteen,bfSixteen, get_llama_wrapper
 from calyapo.training.utils.memory_utils import MemoryTrace
 from accelerate.utils import is_xpu_available, is_ccl_available
@@ -68,7 +68,7 @@ def profile(cfg, local_rank=None):
         yield None
 
 
-def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_scheduler, gradient_accumulation_steps, train_config, fsdp_config=None, local_rank=None, rank=None, wandb_run=None):
+def train(model, train_dataloader, eval_dataloader, tokenizer, optimizer, lr_scheduler, gradient_accumulation_steps, train_config, fsdp_config=None, local_rank=None, rank=None, wandb_run=None):
     """
     Trains the model on the given dataloader
 
@@ -94,7 +94,17 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
     if train_config.enable_fsdp:
         world_size = int(os.environ["WORLD_SIZE"])
 
+    # ------ ADDED ------
+    unique_folder = None
+    if not train_config.enable_fsdp or rank == 0:
+        unique_folder = generate_timestamped_folder(train_config)
 
+    # sync with other GPUs
+    if train_config.enable_fsdp:
+        folder_list = [unique_folder]
+        torch.distributed.broadcast_object_list(folder_list, src=0)
+        unique_folder = folder_list[0]
+    # ------ ADDED ------
 
     autocast = torch.cuda.amp.autocast if train_config.use_fp16 else nullcontext
     train_prep = []
@@ -266,6 +276,8 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
         
         checkpoint_start_time = time.perf_counter()
         if should_save_model:
+            save_path = Path(train_config.output_dir) / unique_folder
+
             if train_config.enable_fsdp:
                 dist.barrier()
             if train_config.use_peft:
@@ -274,16 +286,16 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
                         print(f"we are about to save the PEFT modules")
                 else:
                     print(f"we are about to save the PEFT modules")
-                save_peft_checkpoint(model, train_config.output_dir)
+                save_peft_checkpoint(model, save_path) # ADDED
                 if train_config.enable_fsdp:
                     if rank==0:
-                        print(f"PEFT modules are saved in {train_config.output_dir} directory")
+                        print(f"PEFT modules are saved in {save_path} directory")
                 else:
-                    print(f"PEFT modules are saved in {train_config.output_dir} directory")
+                    print(f"PEFT modules are saved in {save_path} directory")
 
             else:
                 if not train_config.enable_fsdp:
-                    save_model_checkpoint(model, train_config.output_dir)
+                    save_model_checkpoint(model, save_path) # ADDED
                     
                 elif fsdp_config.checkpoint_type == StateDictType.FULL_STATE_DICT:
                     print(" Saving the FSDP model checkpoint using FULL_STATE_DICT")
