@@ -18,6 +18,7 @@ from tqdm import tqdm
 from transformers import LlamaTokenizer
 import json
 
+from datetime import timedelta
 
 from calyapo.training.model_checkpointing import save_fsdp_model_checkpoint_full, save_model_and_optimizer_sharded, save_optimizer_checkpoint, save_peft_checkpoint, save_model_checkpoint, generate_timestamped_folder
 from calyapo.training.policies import fpSixteen,bfSixteen, get_llama_wrapper
@@ -503,13 +504,14 @@ def check_frozen_layers_peft_model(model):
             for name, param in layer.named_parameters():
                 print(f"Layer {i}, parameter {name}: requires_grad = {param.requires_grad}")
 
-def setup():
+def setup(timeout: timedelta = None):
     """Initialize the process group for distributed training"""
+    
     if is_ccl_available():
         # distributed training on xpus
-        dist.init_process_group("ccl")
+        dist.init_process_group("ccl", timeout=timeout)
     else:
-        dist.init_process_group("nccl")
+        dist.init_process_group("nccl", timeout=timeout)
 
 
 def setup_environ_flags(rank):

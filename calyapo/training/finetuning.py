@@ -7,6 +7,8 @@ import random
 from collections import Counter
 from warnings import warn, simplefilter
 
+from datetime import timedelta
+
 import fire
 import numpy as np
 import torch
@@ -97,7 +99,7 @@ def main(**kwargs):
     np.random.seed(train_config.seed)
 
     if train_config.enable_fsdp:
-        setup()
+        setup(timeout=timedelta(seconds=1800))
         # torchrun specific
         local_rank = int(os.environ["LOCAL_RANK"])
         rank = int(os.environ["RANK"])
@@ -150,6 +152,14 @@ def main(**kwargs):
     # Load the pre-trained model and setup its configuration
     use_cache = False if train_config.enable_fsdp else None
     config = AutoConfig.from_pretrained(train_config.model_name)
+    # ----- ADDED -----
+    if train_config.enable_fsdp and fsdp_config.pure_bf16:
+        target_dtype = torch.bfloat16
+    elif train_config.use_fp16:
+        target_dtype = torch.float16
+    else:
+        target_dtype = "auto"
+    # ----- ADDED -----
     if config.model_type == "mllama":
         is_vision = True
         model = MllamaForConditionalGeneration.from_pretrained(
@@ -161,7 +171,7 @@ def main(**kwargs):
                 if train_config.quantization and not train_config.enable_fsdp
                 else None
             ),
-            torch_dtype=torch.float16 if train_config.use_fp16 else "auto",
+            torch_dtype=target_dtype,
         )
         processor = AutoProcessor.from_pretrained(
             train_config.model_name
@@ -191,7 +201,7 @@ def main(**kwargs):
                         if train_config.quantization and not train_config.enable_fsdp
                         else None
                     ),
-                    torch_dtype=torch.float16 if train_config.use_fp16 else "auto", 
+                    torch_dtype=target_dtype, 
                     low_cpu_mem_usage=train_config.low_cpu_mem_usage # ADDED
                 )
         # ------ ADDED ------ 
@@ -213,7 +223,7 @@ def main(**kwargs):
                     if train_config.quantization and not train_config.enable_fsdp
                     else None
                 ),
-                torch_dtype=torch.float16 if train_config.use_fp16 else"auto",
+                torch_dtype=target_dtype,
             )
         # ------ ADDED ------ 
         print(f"--> Using language model of type '{config.model_type}' ") # shifted down

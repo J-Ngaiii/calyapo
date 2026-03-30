@@ -21,18 +21,18 @@
 #SBATCH --error=logs/%j.err
 
 # --- Environment Setup ---
-# 1. Create the directory specifically named 'slurm' for the #SBATCH output logs
+# Create the directory specifically named 'slurm' for the #SBATCH output logs
 mkdir -p slurm
 mkdir -p logs
 
-# 2. Navigate to your project directory
+# Navigate to your project directory
 cd /global/home/users/jonathanngai/calyapo
 if [ $? -ne 0 ]; then
   echo "Error: Could not change directory. Exiting."
   exit 1
 fi
 
-# 3. Activate your virtual environment
+# Activate your virtual environment
 source /global/home/users/jonathanngai/miniconda3/etc/profile.d/conda.sh
 conda activate calypo
 if [ $? -ne 0 ]; then
@@ -48,17 +48,21 @@ if [ -f .env ]; then # store API keys in a local .env file then search for the v
 fi
 export TOKENIZERS_PARALLELISM=false # for debugging we wanna just use one gpu with batch size 1
 
+# Set longer time for GPUs to wait for each other because it takes time to load weights from rank 0
+export NCCL_BLOCKING_WAIT=1
+export NCCL_TIMEOUT=180000
+
 # Distributed Setup
 NPROC_PER_NODE=2                      # Match this to your --gres=gpu count
 MASTER_PORT=$(expr 10000 + $(echo -n $SLURM_JOBID | tail -c 4)) # Random port to avoid collisions
 
 # Model/Data Params
-DATASET="test_plan_dataset"
+DATASET="opinion_school_dataset"
 MODEL_NAME="meta-llama/Llama-2-7b-hf"
 OUTPUT_DIR="calyapo/training/checkpoints/${DATASET}"
 USE_PEFT=True
-BATCH_SIZE_TRAINING=4
-BATCH_SIZE_VALIDATION=8
+BATCH_SIZE_TRAINING=16
+BATCH_SIZE_VALIDATION=32
 GRADIENT_ACCUMULATION_STEPS=4
 DIST_CHECKPOINT_ROOT_FOLDER="/global/home/users/jonathanngai/calyapo/calyapo/training/checkpoints/${DATASET}"
 DIST_CHECKPOINT_FOLDER="fine-tuned"
@@ -69,9 +73,10 @@ GAMMA=0.85
 LR=1e-5
 NUM_EPOCHS=3
 MODEL_NICKNAME="llama7b"
-ENABLE_FSDP=False
-LOW_CPU_FSDP=False
+ENABLE_FSDP=True
+LOW_CPU_FSDP=True
 LOW_CPU_MEM_USAGE=True
+PURE_BF16=True
 
 print_header() {
     echo "------------------------------------------------"
@@ -115,7 +120,7 @@ torchrun --nnodes=1 \
     scripts/experiment/run_finetune.py \
     --enable_fsdp ${ENABLE_FSDP} \
     --low_cpu_fsdp ${LOW_CPU_FSDP} \
-    --fsdp_config.pure_bf16 False \
+    --fsdp_config.pure_bf16 ${PURE_BF16} \
     --use_peft=${USE_PEFT} \
     --quantization "4bit" \
     --use_fast_kernels \
