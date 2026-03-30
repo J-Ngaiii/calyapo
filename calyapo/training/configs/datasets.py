@@ -72,6 +72,13 @@ class presidents_to_abortion_dataset (calyapo_dataset_config):
     predict_eos: bool = True
 
 @dataclass
+class opinion_school_dataset (calyapo_dataset_config):
+    dataset: str = "test_plan_dataset" 
+    train_split: str = f"{str(UNIVERSAL_FINAL_FOLDER)}/opinion_school_train.jsonl"
+    test_split: str = f"{str(UNIVERSAL_FINAL_FOLDER)}/opinion_school_val.jsonl"
+    predict_eos: bool = True
+
+@dataclass
 class test_plan_dataset (calyapo_dataset_config):
     dataset: str = "test_plan_dataset" 
     train_split: str = f"{str(UNIVERSAL_FINAL_FOLDER)}/test_plan_train.jsonl"

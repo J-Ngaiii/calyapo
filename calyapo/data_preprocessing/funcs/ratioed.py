@@ -183,7 +183,7 @@ def split_ratio(
 
     return outPack
 
-def split_ratio_validator(pack: DataPackage, verbose: bool = False):
+def split_ratio_validator(pack: DataPackage, valid_indiv_setting: str = None, verbose: bool = False, debug: bool = False):
     """
     Ensures every unique individual exists in exactly one split with no overlaps.
     Catch both duplicates within a set and leakage across sets.
@@ -202,7 +202,7 @@ def split_ratio_validator(pack: DataPackage, verbose: bool = False):
         for indiv_map in pack[splt]:
             indiv_id = get_unique_id(indiv_map)
             id_registry[indiv_id].append(splt)
-            if not indiv_valid_response(indiv_map, splt, 'all'):
+            if not indiv_valid_response(indiv_map=indiv_map, splt=splt, check=valid_indiv_setting, debug=debug):
                 id_registry[indiv_id].append(f"{splt}-contains NaN")
 
     leaks = {

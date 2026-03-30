@@ -161,7 +161,7 @@ class Individual:
                         }
         self.indiv_map_base = {
                 "id" : self.id, # default to row index, can use igs id or can just not
-                "uniqueid" : self.uniqueid
+                "uniqueid" : self.uniqueid, 
                 "time" : self.time_period, 
                 "demog" : self.demog,
                 "dataset" : self.dataset_name,  
@@ -318,11 +318,8 @@ class Individual:
             return self.return_test_indiv_map()
 
     def return_full_indiv_map(self):
-        entry = self.indiv_map_base{
-                "id" : self.id, # default to row index, can use igs id or can just not
-                "time" : self.time_period, 
-                "demog" : self.demog,
-                "dataset" : self.dataset_name,  
+        entry = {
+                **self.indiv_map_base, 
                 "train" : self.question_map['train'],
                 "val" : self.question_map['val'],
                 "test" : self.question_map['test'],
@@ -331,30 +328,21 @@ class Individual:
     
     def return_train_indiv_map(self):
         entry = {
-                "id" : self.id, 
-                "time" : self.time_period, 
-                "demog" : self.demog,
-                "dataset" : self.dataset_name,  
+                **self.indiv_map_base,  
                 "train" : self.question_map['train']
             }
         return entry
     
     def return_val_indiv_map(self):
         entry = {
-                "id" : self.id, 
-                "time" : self.time_period, 
-                "demog" : self.demog,
-                "dataset" : self.dataset_name,  
+                **self.indiv_map_base,   
                 "val" : self.question_map['val'],
             }
         return entry
     
     def return_test_indiv_map(self):
         entry = {
-                "id" : self.id, 
-                "time" : self.time_period, 
-                "demog" : self.demog,
-                "dataset" : self.dataset_name,  
+                **self.indiv_map_base, 
                 "test" : self.question_map['test'],
             }
         return entry

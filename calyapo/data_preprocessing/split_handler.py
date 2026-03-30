@@ -106,7 +106,7 @@ class SplitHandler:
         )
 
         if self.train_setting == 1 or self.train_setting == 3:
-            split_ratio_validator(out_pack, verbose)
+            split_ratio_validator(pack=out_pack, valid_indiv_setting=self.valid_indiv_setting, verbose=verbose, debug=debug)
         else:
             if verbose: print(f"(Split Handler | Ratioing) On training setting {self.train_setting}, validator inactive")
 
