@@ -36,7 +36,7 @@ def generate_timestamped_folder(cfg) -> Path:
     """
     Constructs a path like: root/wd0.1_gam0.85_lr1e-5_2026-03-29-08:31:12_PM
     """
-    timestamp = datetime.now().strftime("%Y-%m-%d-%I:%M:%S_%p")
+    timestamp = datetime.now().strftime("%Y-%m-%d-%I-%M-%S_%p")
     folder_name = (
         f"wd{cfg.weight_decay}_"
         f"gam{cfg.gamma}_"
