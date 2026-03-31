@@ -23,6 +23,8 @@ VARLABEL_DESC = {
     'oppose_immigration_senate' : 'Importance of Senatorial Candidate Immigration Toughness',
     'biden_opinion' : 'Joe Biden Favorability',
     'harris_opinion' : 'Kamala Harris Favorability'
+
+    
 }
 
 # IGS finetuning variable maps
@@ -61,6 +63,12 @@ TEST_PLAN = {
     'test_resp' : ['oppose_immigration_senate']
 }
 
+TEST_PLAN_CES = {
+    'demo' : ['age', 'partyid', 'ideology', 'race', 'gender', 'sex', 'env_urban', 'marital'], 
+    'train_resp' : [], 
+    'val_resp' : [], 
+    'test_resp' : []
+}
 
 # all plans
 TRAIN_PLANS = {
@@ -98,6 +106,14 @@ TRAIN_PLANS = {
             'train_setting' : 2, 
             'valid_indiv_setting' : 'any', 
             'reduction_modifier' : 0.1
+        }, 
+    'test_plan_ces' : {
+            'variable_map': TEST_PLAN_CES, 
+            'homogenous_var_plan' : True, 
+            'datasets' : set(['CES']), 
+            'question_varies_by_split' : False, # of course will be true
+            'train_setting' : 1, 
+            'valid_indiv_setting' : 'any', 
         }, 
     'opinion_school' : {
             'variable_map': OPINION_SCHOOL, 

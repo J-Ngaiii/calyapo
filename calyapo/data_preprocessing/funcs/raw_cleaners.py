@@ -7,6 +7,46 @@ from calyapo.configurations.config import IGS_RACE_MAP, UNIVERSAL_NA_FILLER
 from calyapo.data_preprocessing.cleaning_objects import DataPackage
 from calyapo.utils.persistence import *
 
+def _process_single_df(df: pd.DataFrame, period: str, mode: str = 'IGS', debug: bool = False) -> pd.DataFrame:
+    """
+    Hidden helper: Performs the actual vectorized race collapse and metadata tagging.
+    """
+    df = df.copy()
+    
+    if 'time_period' not in df.columns:
+        df['time_period'] = period
+
+    if mode == 'IGS':
+        if period not in IGS_RACE_MAP:
+            raise ValueError(f"Inputted period '{period}' not in race map")
+        RACE_MAP = IGS_RACE_MAP[period]
+
+        present_race_cols = [col for col in RACE_MAP.keys() if col in df.columns]
+        if present_race_cols:
+            encodings = np.array([RACE_MAP[col] for col in present_race_cols])
+            matrix = (
+                df[present_race_cols]
+                .astype(object)
+                .replace(r'^\s*$', np.nan, regex=True) # replaces empty or whitespace strings
+                .fillna(0)
+                .astype(int)
+                .values
+            )
+            if debug:
+                print(f"(process_single | Debug) matrix datatype: {matrix.dtype}\n(process_single | Debug) labels datatype: {encodings.dtype}")
+            temp_df = pd.DataFrame(matrix, columns=encodings)
+            collapsed = temp_df.idxmax(axis=1)
+            row_sums = matrix.sum(axis=1)
+            collapsed[row_sums == 0] = UNIVERSAL_NA_FILLER
+            if debug:
+                print(f"(process_single | Debug) collapsed vals:\n{collapsed}")
+            df['racial_id'] = collapsed.values
+            if debug:
+                print(f"(process_single | Debug) final df race col and time col:\n{df[['racial_id', 'time_period']]}")
+    elif mode == 'CES':
+        pass
+    return df
+
 def IGS_raw_clean(
         dataPackage: DataPackage, 
         out_path: str = None, 
@@ -27,7 +67,7 @@ def IGS_raw_clean(
 
     output = []
     for df, period in zip(data, time_periods):
-        cleaned_df = _process_single_df(df, period, debug)
+        cleaned_df = _process_single_df(df=df, period=period, mode='IGS', debug=debug)
         output.append(cleaned_df)
         if save:
             assert out_path is not None, f"(IGS_raw) Cannot save file without valid out path"
@@ -38,39 +78,33 @@ def IGS_raw_clean(
     
     return output
 
-def _process_single_df(df: pd.DataFrame, period: str, debug: bool = False) -> pd.DataFrame:
+def CES_raw_clean(
+        dataPackage: DataPackage, 
+        out_path: str = None, 
+        save: bool = False, 
+        debug: bool = False, 
+        verbose: bool = False
+    ) -> List[pd.DataFrame]:
     """
-    Hidden helper: Performs the actual vectorized race collapse and metadata tagging.
+    Main entry point for CES cleaning. Handles both single DFs and 
+    vectorized lists of DFs (e.g., from a directory load).
     """
-    df = df.copy()
     
-    if 'time_period' not in df.columns:
-        df['time_period'] = period
+    data = dataPackage['data'] # list of dataframes for different time periods
+    time_periods = dataPackage['time_periods']
 
-    if period not in IGS_RACE_MAP:
-        raise ValueError(f"Inputted period '{period}' not in race map")
-    RACE_MAP = IGS_RACE_MAP[period]
+    if debug:
+        print(f"(CES_raw | Debug) Data First 5 Vals [type '{type(data)}', shape '{len(data)}'] {data[:5]}'\n(ICES_raw | Debug) Time Periods: [type '{type(time_periods)}']:{time_periods}")
 
-    present_race_cols = [col for col in RACE_MAP.keys() if col in df.columns]
-    if present_race_cols:
-        encodings = np.array([RACE_MAP[col] for col in present_race_cols])
-        matrix = (
-            df[present_race_cols]
-            .astype(object)
-            .replace(r'^\s*$', np.nan, regex=True) # replaces empty or whitespace strings
-            .fillna(0)
-            .astype(int)
-            .values
-        )
-        if debug:
-            print(f"(process_single | Debug) matrix datatype: {matrix.dtype}\n(process_single | Debug) labels datatype: {encodings.dtype}")
-        temp_df = pd.DataFrame(matrix, columns=encodings)
-        collapsed = temp_df.idxmax(axis=1)
-        row_sums = matrix.sum(axis=1)
-        collapsed[row_sums == 0] = UNIVERSAL_NA_FILLER
-        if debug:
-            print(f"(process_single | Debug) collapsed vals:\n{collapsed}")
-        df['racial_id'] = collapsed.values
-        if debug:
-            print(f"(process_single | Debug) final df race col and time col:\n{df[['racial_id', 'time_period']]}")
-    return df
+    output = []
+    for df, period in zip(data, time_periods):
+        cleaned_df = _process_single_df(df=df, period=period, mode='CES', debug=debug)
+        output.append(cleaned_df)
+        if save:
+            assert out_path is not None, f"(CES_raw) Cannot save file without valid out path"
+                
+            data_name = out_path / f"CES_cleaned_{cleaned_df['time_period'].iloc[0]}.csv"
+            
+            file_saver(Path(data_name), cleaned_df, 'csv', verbose=verbose)
+    
+    return output

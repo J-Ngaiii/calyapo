@@ -576,7 +576,157 @@ IGS_MAPS = {
         'label2opt' : IGS_LABEL_TO_OPT_241028, 
         'label2qes' : IGS_LABEL_TO_QES_241028
     }, 
+}
 
-    
+CES_VAR_TO_LABEL_24 = {
+    'caseid' : 'dataset_id',
+    'calculated_age' : 'age', 
+    'party_reg' : 'partyid', 
+    'Q47' : 'ideology', 
+    'racial_id' : 'race', 
+    'Q36' : 'gender', 
+    'SEX' : 'sex', 
+    'URBANICITY' : 'env_urban', 
+    'Q50' : 'marital',
+    'Q37' : 'education',  
+    'Q2_1' : 'trump_opinion', 
+    'Q2_2' : 'biden_opinion', 
+    'Q16_4' : 'defend_abortion_senate', 
+    'Q16_6' : 'oppose_immigration_senate'
+}
 
+CES_LABEL_TO_OPT_24 = {
+    'age' : {
+        '18-29' : [str(i) for i in range(18, 30)], 
+        '30-39' : [str(i) for i in range(30, 40)], 
+        '40-49' : [str(i) for i in range(40, 50)], 
+        '50-64' : [str(i) for i in range(50, 65)], 
+        '65+' : [str(i) for i in range(65, 150)]
+    }, 
+    'partyid' : {
+        'Democrat' : "1", 
+        'Republican' : "4", 
+        'No Party Preference' : "2", 
+        'Other Party' : "3"
+    }, 
+    'ideology' : {
+        'Strongly conservative' : "1", 
+        'Somewhat conservative' : "2", 
+        'Moderate' : "3", 
+        'Somewhat liberal' : "4", 
+        'Strongly liberal' : "5"
+    }, 
+    'race' : {
+        'White': "1", 
+        'Hispanic or Latino' : "2",
+        'Asian' : "3",
+        'Native Hawaiian or Pacific Islander' : "4",
+        'Black or African American' : "5",
+        'Middle Eastern or North African' : "6",
+        'American Indian or Alaska Native' : "7", 
+        'Other' : "8"
+    }, 
+    'gender' : {
+        'Male' : "1", 
+        'Female' : "2", 
+        'Transgender male' : "3", 
+        'Transgender female' : "4", 
+        'Non-binary' : "5"
+    }, 
+    'sex' : {
+        'Female' : "1", 
+        'Male' : "2"
+    }, 
+    'env_urban': {
+        'Rural' : "1", 
+        'Suburb/mix' : "2", 
+        'Urban' : "3"
+    }, 
+    'marital' : {
+        'Married' : "1",
+        'Not married, but live together' : "2",
+        'Separated or divorced' : "3",
+        'Widowed' : "4",
+        'Single, never married' : "5"
+    },
+    'education': {
+        '8th grade or less': "1",
+        'Some high school': "2",
+        'High school graduate': "3",
+        'Trade/vocational school': "4",
+        '1-2 years college/Associate degree': "5",
+        '3 or more years college (no Bachelor\'s degree)': "6",
+        'College graduate (Bachelor\'s degree)': "7",
+        'Post-graduate degree (e.g., Masters, MD, LLD, PhD, etc.)': "8"
+    }, 
+    'trump_opinion' : {
+        'Strongly favorable' : "1", 
+        'Somewhat favorable' : "2", 
+        'Somewhat unfavorable' : "3", 
+        'Strongly unfavorable' : "4", 
+        'No opinion' : "5"
+    }, 
+    'biden_opinion' : {
+        'Strongly favorable' : "1", 
+        'Somewhat favorable' : "2", 
+        'Somewhat unfavorable' : "3", 
+        'Strongly unfavorable' : "4", 
+        'No opinion' : "5"
+    },
+    'defend_abortion_senate' : {
+        'Very important' : "1", 
+        'Somewhat important' : "2", 
+        'Not a reason or not applicable' : "3", 
+        'No opinion' : "4"
+    }, 
+    'oppose_immigration_senate' : {
+        'Very important' : "1", 
+        'Somewhat important' : "2", 
+        'Not a reason or not applicable' : "3", 
+        'No opinion' : "4"
+    },
+}
+
+CES_LABEL_TO_QES_24 =  {
+    'age' : 'What is your age?', 
+    'partyid' : 'Party registration from PDI listing',  
+    'ID' : 'igs_id', 
+    'race' : 'Which of the following best describes your race?  You may select more than one race, if applicable.', 
+    'gender' : 'How would you describe your gender?', 
+    'sex' : 'Sex from PDI listing', 
+    'env_urban' : 'Urbanicity from PDI listing', 
+    'marital' : 'Which of the following best describes your present marital status?',
+    'education' : 'What is the highest year of school that you have finished and gotten credit for?', 
+    'trump_opinion' : "Please indicate whether your opinion of the following political figures is favorable or unfavorable, or whether you don't yet know enough about them to offer an opinion?  (1) Donald Trump, former President", 
+    'biden_opinion' : "Please indicate whether your opinion of the following political figures is favorable or unfavorable, or whether you don't yet know enough about them to offer an opinion?  (2) Joe Biden, President", 
+    'defend_abortion_senate' : 'For each of the following attributes please indicate how important each will be to you when considering whom to support in the U.S. Senate election.   (4).  Would be a strong voice in defending abortion rights for women in the Senate', 
+    'oppose_immigration_senate' : 'For each of the following attributes please indicate how important each will be to you when considering whom to support in the U.S. Senate election.   (6).  Supports tougher immigration laws'
+}
+
+CES_MAPS = {
+    '202402' : { # mappings may change across years
+        'var2label' : IGS_VAR_TO_LABEL_2402, 
+        'label2opt' : IGS_LABEL_TO_OPT_2402, 
+        'label2qes' : IGS_LABEL_TO_QES_2402
+    }, 
+    # '20240529' : { 
+    #     'var2label' : IGS_VAR_TO_LABEL_240529, 
+    #     'label2opt' : IGS_LABEL_TO_OPT_240529, 
+    #     'label2qes' : IGS_LABEL_TO_QES_240529
+    # }, 
+    '20240819' : { 
+        'var2label' : IGS_VAR_TO_LABEL_240819, 
+        'label2opt' : IGS_LABEL_TO_OPT_240819, 
+        'label2qes' : IGS_LABEL_TO_QES_240819
+    }, 
+    '20240925' : { 
+        'var2label' : IGS_VAR_TO_LABEL_240925, 
+        'label2opt' : IGS_LABEL_TO_OPT_240925, 
+        'label2qes' : IGS_LABEL_TO_QES_240925
+    }, 
+    '20241028' : { 
+        'var2label' : IGS_VAR_TO_LABEL_241028, 
+        'label2opt' : IGS_LABEL_TO_OPT_241028, 
+        'label2qes' : IGS_LABEL_TO_QES_241028
+    }, 
 }
