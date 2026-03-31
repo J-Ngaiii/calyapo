@@ -46,11 +46,18 @@ fi
 if [ -f .env ]; then # store API keys in a local .env file then search for the variables
   export $(grep -v '^#' .env | xargs)
 fi
-export TOKENIZERS_PARALLELISM=false # for debugging we wanna just use one gpu with batch size 1
+export TOKENIZERS_PARALLELISM=true
 
 # Set longer time for GPUs to wait for each other because it takes time to load weights from rank 0
-export NCCL_BLOCKING_WAIT=1
-export NCCL_TIMEOUT=180000
+# export NCCL_BLOCKING_WAIT=1
+# export NCCL_TIMEOUT=180000
+
+# more flags
+export NCCL_P2P_DISABLE=1
+export NCCL_IB_DISABLE=1
+export NCCL_DEBUG=INFO
+export NCCL_SOCKET_IFNAME=eth0  # Or the specific interface Savio uses
+export TORCH_DISTRIBUTED_DEBUG=DETAIL
 
 # Distributed Setup
 NPROC_PER_NODE=2                      # Match this to your --gres=gpu count
@@ -72,7 +79,7 @@ WEIGHT_DECAY=0.1
 GAMMA=0.85
 LR=1e-5
 NUM_EPOCHS=3
-MODEL_NICKNAME="llama7b"
+MODEL_NICKNAME="llama2-7b"
 ENABLE_FSDP=True
 LOW_CPU_FSDP=True
 LOW_CPU_MEM_USAGE=True

@@ -1,0 +1,61 @@
+#!/bin/bash
+# from https://docs-research-it.berkeley.edu/services/high-performance-computing/user-guide/running-your-jobs/scheduler-examples/
+#SBATCH --job-name=calyapo_finetune_savio 
+#SBATCH --account=fc_hartmanl2
+#SBATCH --partition=savio3_gpu
+#SBATCH --nodes=1
+#SBATCH --ntasks=2
+
+# Processors per task:
+# Eight times the number for A40 in savio3_gpu
+#SBATCH --cpus-per-task=8
+
+#Number of GPUs
+#SBATCH --gres=gpu:A40:1
+#SBATCH --qos=a40_gpu3_normal
+
+# Wall clock limit:
+#SBATCH --time=10:00:00
+
+#SBATCH --output=logs/%j.out
+#SBATCH --error=logs/%j.err
+
+# --- Environment Setup ---
+# Create the directory specifically named 'slurm' for the #SBATCH output logs
+mkdir -p slurm
+mkdir -p logs
+
+# Navigate to your project directory
+cd /global/home/users/jonathanngai/calyapo
+if [ $? -ne 0 ]; then
+  echo "Error: Could not change directory. Exiting."
+  exit 1
+fi
+
+# Activate your virtual environment
+source /global/home/users/jonathanngai/miniconda3/etc/profile.d/conda.sh
+conda activate calypo
+if [ $? -ne 0 ]; then
+  echo "Error: Could not activate virtual environment. Exiting."
+  exit 1
+fi
+
+# Export API keys
+if [ -f .env ]; then 
+  export $(grep -v '^#' .env | xargs)
+fi
+
+# Distributed Setup
+NPROC_PER_NODE=1                     
+MASTER_PORT=$(expr 10000 + $(echo -n $SLURM_JOBID | tail -c 4)) # Random port to avoid collisions
+
+# Model/Data Params
+TRAIN_PLAN="opinion_school"
+ADAPTER_FOLDER="wd0.1_gam0.85_lr1e-05_2026-03-30-05-54-41_PM"
+LORA=False
+VAL=False
+
+python --train_plan=${TRAIN_PLAN} \
+    --adapter_folder=${ADAPTER_FOLDER} \
+    --USE_LORA=${LORA} \
+    --USE_VAL=${VAL} \

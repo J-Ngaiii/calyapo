@@ -99,7 +99,7 @@ def main(**kwargs):
     np.random.seed(train_config.seed)
 
     if train_config.enable_fsdp:
-        setup(timeout=timedelta(seconds=1800))
+        setup()
         # torchrun specific
         local_rank = int(os.environ["LOCAL_RANK"])
         rank = int(os.environ["RANK"])

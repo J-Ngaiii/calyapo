@@ -55,6 +55,6 @@ class train_config:
 
     # custom fields
     checkpoint_type: str = "StateDictType.FULL_STATE_DICT"
-    model_nickname: str = "llama7b"
+    model_nickname: str = "llama2-7b"
     low_cpu_mem_usage: bool = True
 
