@@ -53,11 +53,11 @@ export TOKENIZERS_PARALLELISM=true
 # export NCCL_TIMEOUT=180000
 
 # more flags
-export NCCL_P2P_DISABLE=1
-export NCCL_IB_DISABLE=1
-export NCCL_DEBUG=INFO
-export NCCL_SOCKET_IFNAME=eth0  # Or the specific interface Savio uses
-export TORCH_DISTRIBUTED_DEBUG=DETAIL
+# export NCCL_P2P_DISABLE=1
+# export NCCL_IB_DISABLE=1
+# export NCCL_DEBUG=INFO
+# export NCCL_SOCKET_IFNAME=eth0  # Or the specific interface Savio uses
+# export TORCH_DISTRIBUTED_DEBUG=DETAIL
 
 # Distributed Setup
 NPROC_PER_NODE=2                      # Match this to your --gres=gpu count
@@ -80,8 +80,8 @@ GAMMA=0.85
 LR=1e-5
 NUM_EPOCHS=3
 MODEL_NICKNAME="llama2-7b"
-ENABLE_FSDP=True
-LOW_CPU_FSDP=True
+ENABLE_FSDP=False
+LOW_CPU_FSDP=False
 LOW_CPU_MEM_USAGE=True
 PURE_BF16=True
 

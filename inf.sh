@@ -50,12 +50,10 @@ NPROC_PER_NODE=1
 MASTER_PORT=$(expr 10000 + $(echo -n $SLURM_JOBID | tail -c 4)) # Random port to avoid collisions
 
 # Model/Data Params
-TRAIN_PLAN="opinion_school"
-ADAPTER_FOLDER="wd0.1_gam0.85_lr1e-05_2026-03-30-05-54-41_PM"
-LORA=False
-VAL=False
+# TRAIN_PLAN="opinion_school"
+# ADAPTER_FOLDER="wd0.1_gam0.85_lr1e-05_2026-03-30-05-54-41_PM"
+TRAIN_PLAN="presidents_to_abortion"
+ADAPTER_FOLDER="wdllama2-7b_wd0.1_gam0.85_lr1e-05_2026-03-31-01-48-42PM"
 
-python --train_plan=${TRAIN_PLAN} \
+python scripts/llm/offline_inf.py --train_plan=${TRAIN_PLAN} \
     --adapter_folder=${ADAPTER_FOLDER} \
-    --USE_LORA=${LORA} \
-    --USE_VAL=${VAL} \

@@ -44,6 +44,7 @@ def run_inference(engine_params, sampling_params, split, train_plan, input_path,
         model_name = engine_params.get('model', 'Unknown')
         print(f"\n------------------------Dataset Stats------------------------")
         print(f"Dataset:                 {split}")
+        print(f"Number of Datapoints:    {len(raw_data)}")
         print(f"Training Plan:           {train_plan}")
         print(f"Plan using Abbreviation: {TP_ABBREVIATIONS.get(train_plan, 'no abbreviations found')}")
         print(f"-------------------------------------------------------------")
@@ -112,8 +113,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fully runs offline inference pipeline.") 
     parser.add_argument("--train_plan", type=str, nargs='?', default='opinion_school', help="Name of training plan to finetune on.")
     parser.add_argument("--adapter_folder", type=str, nargs='?', default=None, help="Folder with safetensor and json.")
-    parser.add_argument("--use_lora", type=bool, default=False)
-    parser.add_argument("--use_val", type=bool, default=False) # Set True to see the metadata
+    parser.add_argument("--use_lora", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--use_val", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--debug", action=argparse.BooleanOptionalAction, default=True)
     
     args = parser.parse_args()
