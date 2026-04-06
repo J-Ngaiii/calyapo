@@ -3,8 +3,10 @@ import pandas as pd
 import re
 import json
 from pathlib import Path
-from typing import Any, List, Tuple, Iterable, Union, Callable
+from typing import Dict, Any, List, Tuple, Iterable, Union, Callable
 from calyapo.data_preprocessing.cleaning_objects import DataPackage
+from calyapo.configurations.data_map_config import TRAIN_PLANS
+
 
 LOADERS: dict[str, Callable[[Path], Any]] = {
     'csv': pd.read_csv,
@@ -126,3 +128,20 @@ def file_saver(out_path: Path, data: Any, data_type: str, indnt: int = 4, verbos
             json.dump(data.to_dict(), f, indent=indnt)
     
     if verbose: print(f"(File Saver) Results saved to: {out_path}")
+
+def report_path(report_conf: Dict, output_parent: Union[str|Path] = "inference_outputs", time_folder: Union[str|None] = None):
+    train_plan: str = report_conf['train_plan']
+    report_name: str = report_conf.get('report_name', "plot_package")
+    save_file_type: str = report_conf.get('save_file_type', "png")
+
+    if train_plan not in TRAIN_PLANS:
+        raise ValueError(f"Inputted report config '{train_plan}' does not specify valid train plan")
+    
+    base_path = Path(output_parent) / Path(train_plan)
+    if time_folder:
+        base_path = base_path / Path(time_folder)
+    base_path = base_path / Path('reports')
+    Path(base_path).mkdir(parents=True, exist_ok=True)
+    save_path = base_path / f"{train_plan}_{report_name}.{save_file_type}"
+
+    return save_path

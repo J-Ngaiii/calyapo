@@ -2,9 +2,6 @@
 
 CalyAPO is Jonathan Ngai's Data Science Honors Thesis repository for analyzing California public opinion data and training neural net models.
 
-# Idea
-- If we split each dataset into train/val/test based on predefined ratios then comebine them back together the whole thing => the overall ratios will be preserved for the combined dataset and each split will have a proportionate number of individuals from each dataset
-
 # Pipeline design
 - The cleaning functions in raw_cleaners.py clean_datasets.py and data_combiner.py are never supposed to interact with the Orchestrator class. The Orchestrator acts upon and manipulates functions in those files. 
 - The cleaning functions in raw_cleaners.py clean_datasets.py and data_combiner.py should not be pulling from paths directly but rather passing data in memory. The Orchestrator class can handle pulling. 
