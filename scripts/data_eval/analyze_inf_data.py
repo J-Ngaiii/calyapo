@@ -20,10 +20,11 @@ def get_path(train_plan, time_folder=None, verbose=False):
 
     if not base_path.exists():
         raise FileNotFoundError(f"Directory not found: {base_path}")
-    pattern = re.compile(r"(results|config)_(training|train|validation)_.*?(lora|base)_(\d{8}_\d{6})\.(jsonl|json)")
+    pattern = re.compile(r"(results|config)_(training|train|validation|test)_.*?(lora|base)_(\d{8}_\d{6})\.(jsonl|json)")
 
     found_files = {}
 
+    # collect files in a dictionary
     for file_path in base_path.iterdir():
         match = pattern.match(file_path.name)
         if match:
@@ -32,6 +33,8 @@ def get_path(train_plan, time_folder=None, verbose=False):
                 split_key = 'train' 
             elif 'val' in split:
                 split_key = 'val' 
+            elif 'test' in split:
+                split_key = 'test'
             else:
                 if verbose: 
                     print(f"Split keyword '{split}' not recognized, skipping file.")
@@ -52,12 +55,12 @@ def get_path(train_plan, time_folder=None, verbose=False):
                 continue
             found_files[split_key][model_type][key_name] = file_path
 
-    out = {
-        'train_lora': found_files.get('train', {}).get('lora', {}),
-        'train_base': found_files.get('train', {}).get('base', {}),
-        'val_lora':   found_files.get('val', {}).get('lora', {}),
-        'val_base':   found_files.get('val', {}).get('base', {}),
-    }
+    # index into path collection dictionary to format final output
+    out = {}
+    for split in ['train', 'val', 'test']:
+        for model_type in ['lora', 'base']:
+            key: str = f"{split}_{model_type}"
+            out[key] = found_files.get(split, {}).get(model_type, {})
 
     for key, paths in out.items():
         if not paths or 'results_path' not in paths or 'config_path' not in paths:
@@ -118,7 +121,7 @@ def calculate_accuracy(results_path, config_path, bootstrap=False, verbose=False
     stat_dict = { # encodes relevant singular-valued statistics
         'Model Accuracy' : acc, 
         'Lower CI' : lower_ci, 
-        'Higher CI' : lower_ci
+        'Higher CI' : upper_ci
     }
     list_dict = { # encodes relevant multi-valued lists and matrices
         'Bootstrapped Means' : bootstrapped_means

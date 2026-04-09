@@ -80,8 +80,8 @@ def run_inference(engine_params, sampling_params, split, train_plan, input_path,
 
     ts = get_timestamp()
     model_type = "lora" if engine_params.get('enable_lora', False) else "base"
-    results_file = output_folder / f"results_{split}_{TP_ABBREVIATIONS[train_plan]}_{model_type}_{ts}.jsonl"
-    config_file = output_folder / f"config_{split}_{TP_ABBREVIATIONS[train_plan]}_{model_type}_{ts}.json"
+    results_file = output_folder / Path(model_name) / f"results_{split}_{TP_ABBREVIATIONS[train_plan]}_{model_type}_{ts}.jsonl"
+    config_file = output_folder / Path(model_name) / f"config_{split}_{TP_ABBREVIATIONS[train_plan]}_{model_type}_{ts}.json"
     full_config = {
         "timestamp": ts,
         "engine_params": engine_params,
@@ -114,8 +114,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fully runs offline inference pipeline.") 
     parser.add_argument("--train_plan", type=str, nargs='?', default='opinion_school', help="Name of training plan to finetune on.")
     parser.add_argument("--adapter_folder", type=str, nargs='?', default=None, help="Folder with safetensor and json.")
-    parser.add_argument("--use_lora", action=argparse.BooleanOptionalAction, default=False)
-    parser.add_argument("--use_val", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--model_type", type=str, choices=['lora', 'base'], default='train')
+    parser.add_argument("--split", type=str, choices=['train', 'val', 'test'], default='train')
     parser.add_argument("--debug", action=argparse.BooleanOptionalAction, default=True)
     
     args = parser.parse_args()
@@ -127,8 +127,8 @@ if __name__ == "__main__":
     OUTPUT_FOLDER = Path(f"inference_outputs/{TRAIN_PLAN}")
     LORA_ADAPTER_PATH = Path(f"calyapo/training/checkpoints/{TRAIN_PLAN}_dataset/{args.adapter_folder}")
     
-    USE_LORA = args.use_lora
-    USE_VAL = args.use_val
+    USE_LORA = args.model_type.lower() == 'lora'
+    SPLIT = args.split
 
     basic_inf_engine_config = {
         "model": "meta-llama/Llama-2-7b-hf",
@@ -158,12 +158,15 @@ if __name__ == "__main__":
         engine_config = basic_inf_engine_config
         lora_path = None
 
-    if USE_VAL:
+    if SPLIT == 'val':
         inf_split = "validation"
         input_path = VAL_PATH
-    else:
+    elif SPLIT == 'train':
         inf_split = "training"
         input_path = TRAIN_PATH
+    elif SPLIT == 'test':
+        inf_split = "test"
+        input_path = TEST_PATH
 
     OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
 
