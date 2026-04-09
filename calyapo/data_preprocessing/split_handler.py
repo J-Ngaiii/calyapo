@@ -7,7 +7,7 @@ from calyapo.data_preprocessing.funcs.data_combiner import *
 from calyapo.data_preprocessing.funcs.ratioed import *
 from calyapo.data_preprocessing.raw_handler import RawHandler
 from calyapo.configurations.data_map_config import TRAIN_PLANS
-from calyapo.configurations.config import UNIVERSAL_PENULTIMATE_FOLDER
+from calyapo.configurations.config import UNIVERSAL_PENULTIMATE_FOLDER, DATA_PATHS
 from calyapo.utils.persistence import *
 
 class SplitHandler:

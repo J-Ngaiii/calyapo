@@ -58,15 +58,16 @@ from transformers import (
     BitsAndBytesConfig,
     LlamaForCausalLM,
     MllamaForConditionalGeneration,
+    AutoModelForCausalLM
 )
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
 from transformers.models.mistral.modeling_mistral import MistralDecoderLayer # mistral support (custom)
+from transformers.models.qwen2.modeling_qwen2 import Qwen2DecoderLayer # for qwen support (custom)
 from transformers.models.mllama.modeling_mllama import (
     MllamaCrossAttentionDecoderLayer,
     MllamaSelfAttentionDecoderLayer,
     MllamaVisionEncoderLayer,
 )
-
 
 def setup_wandb(train_config, fsdp_config, **kwargs):
     try:

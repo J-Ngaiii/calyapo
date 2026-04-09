@@ -6,11 +6,11 @@ from typing import List, Dict, Union
 import math
 
 from calyapo.configurations.data_map_config import ALL_DATA_MAPS
-from calyapo.configurations.config import DATA_PATHS, UNIVERSAL_NA_FILLER
+from calyapo.configurations.config import UNIVERSAL_NA_FILLER
 from calyapo.data_preprocessing.cleaning_objects import Individual, TrainPlanWrapper, DataPackage
 from calyapo.utils.persistence import *
 
-def process_csv(data: pd.DataFrame, dataset_name: str, train_plan: str, reduction_modifier: float = None, debug: bool = False, verbose: bool = False) -> DataPackage:
+def process_csv(data: pd.DataFrame, dataset_name: str, train_plan: str, reduction_modifier: float = None, seed: int = 42, debug: bool = False, verbose: bool = False) -> DataPackage:
     """
     Process a single CSV file or dataframe and return a DataPackage.
     """
@@ -85,10 +85,17 @@ def process_csv(data: pd.DataFrame, dataset_name: str, train_plan: str, reductio
     )
 
     if reduction_modifier is not None:
-        cleaned_data = list(np.random.choice(cleaned_data, size=math.floor(len(cleaned_data) * reduction_modifier), replace=False))
-        train_data = list(np.random.choice(train_data, size=math.floor(len(train_data) * reduction_modifier), replace=False))
-        val_data = list(np.random.choice(val_data, size=math.floor(len(val_data) * reduction_modifier), replace=False))
-        test_data = list(np.random.choice(test_data, size=math.floor(len(test_data) * reduction_modifier), replace=False))
+        rng = np.random.default_rng(seed)
+
+        n = len(cleaned_data)
+        reduced_size = math.floor(n * reduction_modifier)
+        indices = rng.choice(n, size=reduced_size, replace=False)
+
+        cleaned_data = [cleaned_data[i] for i in indices]
+        train_data = [train_data[i] for i in indices]
+        val_data = [val_data[i] for i in indices]
+        test_data = [test_data[i] for i in indices]
+        
         if verbose: print(f"(process_csv) reduction modifier '{reduction_modifier}' active, new dataset size: '{len(cleaned_data)}'")
 
     pack.add_data('full', cleaned_data)

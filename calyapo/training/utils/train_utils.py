@@ -118,7 +118,7 @@ def train(model, train_dataloader, eval_dataloader, tokenizer, optimizer, lr_sch
     if train_config.save_metrics:
         if not os.path.exists(train_config.output_dir):
             os.makedirs(train_config.output_dir, exist_ok=True)
-        metrics_filename = f"{train_config.output_dir}/metrics_data_{local_rank}-{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.json"
+        metrics_filename = f"{train_config.output_dir}/metrics_data_{local_rank}_{train_config.model_nickname}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.json"
         train_step_perplexity = []
         train_step_loss = []
         train_step_accuracy = [] # ADDED

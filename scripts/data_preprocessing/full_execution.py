@@ -10,14 +10,15 @@ def main():
     parser.add_argument("--train_ratio", type=float, nargs='?', default=0.7, help="Proportion of data on training.")
     parser.add_argument("--val_ratio", type=float, nargs='?', default=0.2, help="Proportion of data on validation.")
     parser.add_argument("--test_ratio", type=float, nargs='?', default=0.1, help="Proportion of data on test.")
+    parser.add_argument("--seed", type=int, nargs='?', default=42, help="Seed for any and all random processes")
     parser.add_argument("--save", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--verbose", action=argparse.BooleanOptionalAction, default=True) # Set True to see the metadata
     parser.add_argument("--debug", action=argparse.BooleanOptionalAction, default=True)
     
     args = parser.parse_args()
     
-    raw_handler = RawHandler()
-    split_handler = SplitHandler(
+    raw_handler = RawHandler() # no randomness 
+    split_handler = SplitHandler( # randomness based on training setting
         train_plan=args.train_plan, 
         train_ratio=args.train_ratio, 
         val_ratio=args.val_ratio, 

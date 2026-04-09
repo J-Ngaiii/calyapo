@@ -1,15 +1,12 @@
 import pandas as pd
 import numpy as np
-import random
-from typing import List, Dict
+from typing import Union, List, Dict, Iterable
 from collections import defaultdict
 
 from calyapo.data_preprocessing.cleaning_objects import DataPackage, Individual
-from calyapo.configurations.config import UNIVERSAL_RANDOM_SEED, UNIVERSAL_NA_FILLER
+from calyapo.configurations.config import UNIVERSAL_NA_FILLER
 from calyapo.utils.sampling import *
 from calyapo.utils.persistence import *
-
-random.seed(UNIVERSAL_RANDOM_SEED)
 
 def get_unique_id(indiv_map: Dict):
     if 'uniqueid' in indiv_map:
@@ -19,32 +16,44 @@ def get_unique_id(indiv_map: Dict):
 
     return id
 
-def indiv_valid_response(indiv_map: Dict, splt: str, check: str = None, debug: str = False):
-    if check is None:
-        check = 'all'
-    
-    option_map = indiv_map[splt].get('var_label2qst_option', {})
+def _indiv_helper(option_map: Dict, check: str) -> bool:
+    """
+    Takes in only one option map. Combine outputs from stacking these functions together then use union/intersection operations 
+    to find relevant combinations (eg all individuals who are in the train and validation set).
+    """
 
-    # if debug:
-        # if indiv_map['time'] != '202402':
-        #     print(f"(indiv_valid | Debug) time period '{indiv_map['time']}' option_map: {option_map}")
-        
+    results = [opt.get('option_letter') != UNIVERSAL_NA_FILLER 
+            for opt in option_map.values()]
     if check == 'all':
         # need to iterate thru all the label : option_dict values
         # option_map = {
         #   'ideology' : {'option_letter' : 'A', 'option_text' : 'XYZ'}, 'trump' : {'option_letter' : 'B', 'option_text' : 'shdsah'}
         # }
-        has_data = all(
-            # responses to all questions not NaN
-            opt.get('option_letter') != UNIVERSAL_NA_FILLER 
-            for opt in option_map.values()
-        ) # training plans with multiple train/val/test questions we want ALL questions to be not NA to include
+        has_data = all(results) 
+        # training plans with multiple train/val/test questions we want ALL questions to be not NA to include
     elif check == 'any':
-        has_data = any(
-            # any response to a question not NaN
-            opt.get('option_letter') != UNIVERSAL_NA_FILLER 
-            for opt in option_map.values()
-        )
+        has_data = any(results)
+
+    return has_data
+    
+def indiv_valid_response(indiv_map: Dict, splt: Union[str|Iterable[str]], check: str = None, debug: str = False) -> bool:
+    "Checks if a given indiv_map corresponding to an individual is valid or not under different rules"
+    if check is None:
+        check = 'all'
+    
+    def get_option_map(inputted_splt):
+        return indiv_map[inputted_splt].get('var_label2qst_option', {})
+    
+    if isinstance(splt, str):
+        option_map = get_option_map(splt)
+        has_data = _indiv_helper(option_map=option_map, check=check)
+    elif isinstance(splt, Iterable):
+        # each index corresponds to a split
+        # each elem corresponds to if the individual has a valid response to the questions corresponding with that split
+        indiv_valid_on_splts = [_indiv_helper(get_option_map(curr_split), check) for curr_split in splt]
+        has_data = all(indiv_valid_on_splts) # individual must be valid across all inputted split
+    else:
+        raise ValueError(f"(indiv_valid_response) Inputted splt '{splt}' has invalid datatype '{type(splt)}'")
 
     return has_data
 
@@ -52,10 +61,11 @@ def split_ratio(
         package: DataPackage, 
         target_ratios: Dict[str, float], 
         homogenous_plan: bool, 
-        ques_split_varying: bool,
+        ques_split_varying: bool, 
         train_setting: int, 
         valid_indiv_setting: str = None, 
         out_path: str = None, 
+        seed: int = 42, 
         save: bool = False, 
         debug: bool = False, 
         verbose: bool = False 
@@ -76,7 +86,9 @@ def split_ratio(
                 len(package['train']) == len(package['test'])
             )
             print(f"(split_ratio | Debug) Length of all splits equal: '{test}'")
-            
+
+    rng = np.random.default_rng(seed)
+
     if homogenous_plan and not ques_split_varying or train_setting == 1:
         if debug:
             print(f"(split_ratio| Debug) Train Setting 1: Same question, new individual processing active")
@@ -98,9 +110,7 @@ def split_ratio(
         if debug:
             print(f"(split_ratio| Debug) num unique individuals: '{len(all_valid_indivs)}'\n(split_ratio| Debug) length of initial package: '{len(package['full'])}'")
         
-        indices = np.random.choice(len(all_valid_indivs), size=len(all_valid_indivs), replace=False)
-
-        random.shuffle(indices)
+        indices = rng.permutation(len(all_valid_indivs)) # shuffle using more up to date numpy rng generator
         
         n = len(all_valid_indivs)
         train_end = int(n * target_ratios['train'])
@@ -121,25 +131,27 @@ def split_ratio(
         for indiv_map in package['full']:
             if indiv_valid_response(indiv_map=indiv_map, splt='train', check=valid_indiv_setting, debug=debug):
                 train_valid_indivs.append(indiv_map)
-            if indiv_valid_response(indiv_map=indiv_map, splt='val', check=valid_indiv_setting, debug=debug):
+            if indiv_valid_response(indiv_map=indiv_map, splt=['train', 'val'], check=valid_indiv_setting, debug=debug):
                 val_valid_indivs.append(indiv_map)
-            if indiv_valid_response(indiv_map=indiv_map, splt='val', check=valid_indiv_setting, debug=debug):
+            if indiv_valid_response(indiv_map=indiv_map, splt=['train', 'test'], check=valid_indiv_setting, debug=debug):
                 test_valid_indivs.append(indiv_map)
 
         if debug:
             print(f"(split_ratio| Debug) num train individuals: '{len(train_valid_indivs)}'\n(split_ratio| Debug) num val individuals: '{len(val_valid_indivs)}'\n(split_ratio| Debug) num val individuals: '{len(test_valid_indivs)}'")
-        
+
         # reduce total num of val and test datapoints
+        # in order to be consistent with standard ML literature make val and test size a fraction of the training set size NOT their own respective sets
+        # otherwise it's possible for the validation and test sizes to be way larger than the train size even with small target_ratio values
         num_train = len(train_valid_indivs)
         val_size = int(num_train * target_ratios['val'])
         test_size = int(num_train * target_ratios['test'])
-        val_indices = np.random.choice(len(val_valid_indivs), size=min(len(val_valid_indivs), val_size), replace=False)
-        test_indices = np.random.choice(len(test_valid_indivs), size=min(len(test_valid_indivs), test_size), replace=False)
+        val_idx = rng.choice(len(val_valid_indivs), size=min(len(val_valid_indivs), val_size), replace=False)
+        test_idx = rng.choice(len(test_valid_indivs), size=min(len(test_valid_indivs), test_size), replace=False)
 
         outPack = DataPackage(package.dataset_name, package.train_plan, package.time_period)
         outPack['train'] = train_valid_indivs
-        outPack['val'] = list(np.array(val_valid_indivs)[val_indices])
-        outPack['test'] = list(np.array(test_valid_indivs)[test_indices])
+        outPack['val'] = [val_valid_indivs[i] for i in val_idx]
+        outPack['test'] = [test_valid_indivs[i] for i in test_idx]
     else:
         # see which split set has the least data points --> check if that is less than the respective ratios
         # if num data points in split set with the least data points is less than its ratio (eg we have less val datapoints than what we should have for val_ratio = 0.2)

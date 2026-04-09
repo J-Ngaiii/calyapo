@@ -25,6 +25,11 @@ CalyAPO is Jonathan Ngai's Data Science Honors Thesis repository for analyzing C
 - add to training/configs/datasets.py
 - add to training/datasets/__init__.py
 
+# Table and Visualization Generation Code
+- Config file sets up different tables
+- Reader func (model name, base_or_lora, split, train_plan) loads results in as a dataframe then passes it to diff calculation functions
+- Calculation functions
+
 # Finetuning execution
 - sbatch script executes caLL
 - scripts/experiment/run_finetune.py --> initiates fire call to execute the actual finetuning.py script

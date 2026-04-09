@@ -109,6 +109,7 @@ def run_inference(engine_params, sampling_params, split, train_plan, input_path,
             }
             f.write(json.dumps(result) + "\n")
     print(f"Results saved to: {results_file}")
+    
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fully runs offline inference pipeline.") 
     parser.add_argument("--train_plan", type=str, nargs='?', default='opinion_school', help="Name of training plan to finetune on.")
@@ -122,6 +123,7 @@ if __name__ == "__main__":
     TRAIN_PLAN = args.train_plan
     TRAIN_PATH = Path(f"calyapo/data/final/{TRAIN_PLAN}_train.jsonl")
     VAL_PATH = Path(f"calyapo/data/final/{TRAIN_PLAN}_val.jsonl")
+    TEST_PATH = Path(f"calyapo/data/final/{TRAIN_PLAN}_test.jsonl")
     OUTPUT_FOLDER = Path(f"inference_outputs/{TRAIN_PLAN}")
     LORA_ADAPTER_PATH = Path(f"calyapo/training/checkpoints/{TRAIN_PLAN}_dataset/{args.adapter_folder}")
     

@@ -48,24 +48,43 @@ if [ -f .env ]; then # store API keys in a local .env file then search for the v
 fi
 export TOKENIZERS_PARALLELISM=true
 
-# Set longer time for GPUs to wait for each other because it takes time to load weights from rank 0
-# export NCCL_BLOCKING_WAIT=1
-# export NCCL_TIMEOUT=180000
-
-# more flags
-# export NCCL_P2P_DISABLE=1
-# export NCCL_IB_DISABLE=1
-# export NCCL_DEBUG=INFO
-# export NCCL_SOCKET_IFNAME=eth0  # Or the specific interface Savio uses
-# export TORCH_DISTRIBUTED_DEBUG=DETAIL
-
 # Distributed Setup
 NPROC_PER_NODE=2                      # Match this to your --gres=gpu count
 MASTER_PORT=$(expr 10000 + $(echo -n $SLURM_JOBID | tail -c 4)) # Random port to avoid collisions
 
 # Model/Data Params
+# Dynamic Model Selection
+MODEL_NICKNAME="llama3.1-8b" 
+
+case $MODEL_NICKNAME in
+  "llama2-7b")
+    MODEL_NAME="meta-llama/Llama-2-7b-hf"
+    ;;
+  "llama3.1-8b")
+    MODEL_NAME="meta-llama/Llama-3.1-8B"
+    ;;
+  "llama3.1-8b-Instruct")
+    MODEL_NAME="meta-llama/Llama-3.1-8B-Instruct"
+    ;;
+  "llama3.2-3b")
+    MODEL_NAME="meta-llama/Llama-3.2-3B"
+    ;;
+  "llama3.2-3b-Instruct")
+    MODEL_NAME="meta-llama/Llama-3.2-3B-Instruct"
+    ;;
+  "llama3.3-70b-Instruct")
+    MODEL_NAME="meta-llama/Llama-3.3-70B-Instruct"
+    ;;
+  "mistral-7b")
+    MODEL_NAME="mistralai/Mistral-7B-v0.3"
+    ;;
+  "qwen2.5-7b-Instruct")
+    MODEL_NAME="Qwen/Qwen2.5-7B-Instruct"
+    ;;
+  *)
+esac
+
 DATASET="opinion_school_dataset"
-MODEL_NAME="meta-llama/Llama-2-7b-hf"
 OUTPUT_DIR="calyapo/training/checkpoints/${DATASET}"
 USE_PEFT=True
 BATCH_SIZE_TRAINING=16
@@ -79,7 +98,6 @@ WEIGHT_DECAY=0.1
 GAMMA=0.85
 LR=1e-5
 NUM_EPOCHS=3
-MODEL_NICKNAME="llama2-7b"
 ENABLE_FSDP=False
 LOW_CPU_FSDP=False
 LOW_CPU_MEM_USAGE=True
