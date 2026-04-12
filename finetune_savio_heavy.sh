@@ -27,6 +27,13 @@ mkdir -p logs
 
 echo "Job started on $(hostname) at $(date)"
 
+# --- Storage Redirection ---
+# Redirecting cache to scratch to avoid Home quota issues
+export HF_HOME="/global/scratch/users/jonathanngai/hf_cache"
+export TORCH_HOME="/global/scratch/users/jonathanngai/torch_cache"
+mkdir -p $HF_HOME
+mkdir -p $TORCH_HOME
+
 # Navigate to your project directory
 cd /global/home/users/jonathanngai/calyapo
 if [ $? -ne 0 ]; then
@@ -58,8 +65,8 @@ MASTER_PORT=$(expr 10000 + $(echo -n $SLURM_JOBID | tail -c 4)) # Random port to
 # MODEL_NAME="meta-llama/Llama-2-7b-hf"
 # MODEL_NICKNAME="llama2-7b" 
 
-MODEL_NAME="meta-llama/Llama-3.1-8B"
-MODEL_NICKNAME="llama3.1-8b" 
+# MODEL_NAME="meta-llama/Llama-3.1-8B"
+# MODEL_NICKNAME="llama3.1-8b" 
 
 # MODEL_NAME="meta-llama/Llama-3.1-8B-Instruct"
 # MODEL_NICKNAME="llama3.1-8b-Instruct" 
@@ -88,7 +95,7 @@ GRADIENT_ACCUMULATION_STEPS=4
 DIST_CHECKPOINT_ROOT_FOLDER="/global/home/users/jonathanngai/calyapo/calyapo/training/checkpoints/${DATASET}"
 DIST_CHECKPOINT_FOLDER="fine-tuned"
 NUM_WORKERS_DATALOADER=2
-ONE_GPU=False
+ONE_GPU=Flase # only use for debugging
 WEIGHT_DECAY=0.1
 GAMMA=0.85
 LR=1e-5
