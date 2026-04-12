@@ -121,11 +121,16 @@ def train(model, train_dataloader, eval_dataloader, tokenizer, optimizer, lr_sch
         metrics_filename = f"{train_config.output_dir}/metrics_data_{local_rank}_{train_config.model_nickname}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.json"
         train_step_perplexity = []
         train_step_loss = []
+        # train_accumulation_loss = [] # ADDED
         train_step_accuracy = [] # ADDED
+        train_accumulation_accuracy = [] # ADDED
         # train_step_predictions = [] # ADDED
-        val_step_loss = []
         val_step_perplexity = []
+        val_step_loss = []
+        # val_accumulation_loss = [] # ADDED
         val_step_accuracy = [] # ADDED
+        # val_accumulation_accuracy = [] # ADDED
+        
         # val_step_predictions = [] # ADDED
 
     epoch_times = []
@@ -149,6 +154,12 @@ def train(model, train_dataloader, eval_dataloader, tokenizer, optimizer, lr_sch
             total_length = len(train_dataloader)//gradient_accumulation_steps
             pbar = tqdm(colour="blue", desc=f"Training Epoch: {epoch+1}", total=total_length, dynamic_ncols=True)
             with profile(train_config,local_rank) as profile_context:
+                # ------ ADDED -----
+                running_step_acc = 0.0
+                # running_step_loss = 0.0
+                # save_accumulation_loss = None
+                save_accumulation_acc = None
+                 # ------ ADDED -----
                 for step, batch in enumerate(train_dataloader):
                     total_train_steps += 1
                     # stop when the maximum number of training steps is reached
@@ -171,6 +182,7 @@ def train(model, train_dataloader, eval_dataloader, tokenizer, optimizer, lr_sch
                     with autocast():
                         outputs = model(**batch)
                         loss = outputs.loss
+                        # raw_micro_loss = outputs.loss.detach().item() # ADDED
                         logits = outputs.logits # ADDED
                         batch_size, seq_length, embed_dim = logits.shape # ADDED NOT USED
 
@@ -180,6 +192,10 @@ def train(model, train_dataloader, eval_dataloader, tokenizer, optimizer, lr_sch
                     epoch_correct += step_correct
                     epoch_total += step_total_tokens
                     step_acc = step_correct / step_total_tokens if step_total_tokens > 0 else 0
+
+                    # gradient accumulation based tracking
+                    running_step_acc += step_acc # ADDED
+                    # running_step_loss += raw_micro_loss # ADDED
 
                     # epoch prediction roll up (STREAM TO DISK EVERY 100 STEPS) 
                     # if train_config.save_metrics and total_train_steps % 100 == 0:
@@ -198,6 +214,24 @@ def train(model, train_dataloader, eval_dataloader, tokenizer, optimizer, lr_sch
 
                         # track accuracy
                         train_step_accuracy.append(step_acc) # ADDED
+
+                        # track grad accumulation based loss and accuracy
+                        if (step + 1) % gradient_accumulation_steps == 0 or step == len(train_dataloader) - 1:
+                            # store everytime we go thru enough batches to fulfill the accumulation window
+                            # eg for accumulation = 4 we update the weights every 4 batches
+                            # then store the accuracy at the last step
+                            actual_steps_accumulated = (step % gradient_accumulation_steps) + 1 
+                            save_accumulation_acc = running_step_acc / actual_steps_accumulated
+                            # save_accumulation_loss = running_step_loss / actual_steps_accumulated
+
+                            train_accumulation_accuracy.append(save_accumulation_acc)
+                            
+                            # save it in a pointer so we can save it in the wandb log
+                            running_step_acc = 0
+                            # running_step_loss = 0 
+                        else:
+                            save_accumulation_acc = None # so WanDB doesn't log values at these stepss 
+                            # save_accumulation_loss = None
 
                     if train_config.use_fp16:
                         # if fp16 is enabled, use gradient scaler to handle gradient update
@@ -235,13 +269,16 @@ def train(model, train_dataloader, eval_dataloader, tokenizer, optimizer, lr_sch
                                 'train/epoch': epoch + 1,
                                 'train/step': epoch * len(train_dataloader) + step,
                                 'train/loss': loss.detach().float(),
-                                'train/accuracy': step_acc # ADDED
+                                'train/accuracy': step_acc,  # ADDED
+                                'train/accumulation_accuracy': save_accumulation_acc # ADDED    
+                                # 'train/accumulation_loss': save_accumulation_loss, # ADDED
+                            
                             })
 
                     pbar.set_description(f"Training Epoch: {epoch+1}/{train_config.num_epochs}, step {step}/{len(train_dataloader)} completed (loss: {loss.detach().float()} / accuracy: {step_acc})")
 
                     if train_config.save_metrics:
-                        save_to_json(metrics_filename, train_step_loss, train_loss, train_step_perplexity, train_prep, train_step_accuracy, train_acc, val_step_loss, val_loss, val_step_perplexity, val_prep, val_step_accuracy, val_acc)
+                        save_to_json(metrics_filename, train_step_loss, train_loss, train_step_perplexity, train_prep, train_step_accuracy, train_acc, train_accumulation_accuracy, val_step_loss, val_loss, val_step_perplexity, val_prep, val_step_accuracy, val_acc)
                 pbar.close()
 
         epoch_end_time = time.perf_counter()-epoch_start_time
@@ -351,7 +388,7 @@ def train(model, train_dataloader, eval_dataloader, tokenizer, optimizer, lr_sch
 
         # Saving the results every epoch to plot later
         if train_config.save_metrics:
-            save_to_json(metrics_filename, train_step_loss, train_loss, train_step_perplexity, train_prep, train_step_accuracy, train_acc, val_step_loss, val_loss, val_step_perplexity, val_prep, val_step_accuracy, val_acc)
+            save_to_json(metrics_filename, train_step_loss, train_loss, train_step_perplexity, train_prep, train_step_accuracy, train_acc, train_accumulation_accuracy, val_step_loss, val_loss, val_step_perplexity, val_prep, val_step_accuracy, val_acc)
 
     avg_epoch_time = sum(epoch_times)/ len(epoch_times)
     avg_checkpoint_time = sum(checkpoint_times)/ len(checkpoint_times) if len(checkpoint_times) > 0 else 0
@@ -656,6 +693,7 @@ def save_to_json(
         train_step_loss, train_epoch_loss, 
         train_step_ppl, train_epoch_ppl, 
         train_step_accuracy, train_epoch_accuracy, 
+        train_accumulation_accuracy, # ADDED
         val_step_loss, val_epoch_loss, 
         val_step_ppl, val_epoch_ppl, 
         val_step_accuracy, val_epoch_accuracy, 
@@ -667,6 +705,7 @@ def save_to_json(
         "train_epoch_perplexity": train_epoch_ppl,
         "train_step_accuracy": train_step_accuracy, # ADDED
         "train_epoch_accuracy": train_epoch_accuracy, # ADDED
+        "train_accumulation_accuracy": train_accumulation_accuracy, # ADDED
         "val_step_loss": val_step_loss,
         "val_epoch_loss": val_epoch_loss,
         "val_step_perplexity": val_step_ppl,

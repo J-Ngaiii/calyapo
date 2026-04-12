@@ -1,19 +1,18 @@
 #!/bin/bash
 # from https://docs-research-it.berkeley.edu/services/high-performance-computing/user-guide/running-your-jobs/scheduler-examples/
 #SBATCH --job-name=calyapo_finetune_savio 
-#SBATCH --account=ic_datah195
-#SBATCH --partition=savio2_1080ti
+#SBATCH --account=fc_hartmanl2
+#SBATCH --partition=savio4_gpu
 #SBATCH --nodes=1
-#SBATCH --ntasks=1
+#SBATCH --ntasks=1 # keep as 1
 
 # Processors per task:
-# Two times the number of GPUs for 1080ti in savio2_1080ti
-#SBATCH --cpus-per-task=2
+# Eight times the number for L40 in savio4_gpu
+#SBATCH --cpus-per-task=8
 
 #Number of GPUs
-#SBATCH --gres=gpu:1
-
-#SBATCH --qos=savio_normal
+#SBATCH --gres=gpu:l40:1 
+#SBATCH --qos=savio_lowprio
 
 # Wall clock limit:
 #SBATCH --time=60:00:00
@@ -22,7 +21,7 @@
 #SBATCH --error=logs/%j.err
 
 # --- Environment Setup ---
-# 1. Create the directory specifically named 'slurm' for the #SBATCH output logs
+# Create the directory specifically named 'slurm' for the #SBATCH output logs
 mkdir -p slurm
 mkdir -p logs
 
@@ -81,12 +80,12 @@ MODEL_NICKNAME="llama3.1-8b"
 DATASET="opinion_school_dataset"
 OUTPUT_DIR="calyapo/training/checkpoints/${DATASET}"
 USE_PEFT=True
-BATCH_SIZE_TRAINING=16
-BATCH_SIZE_VALIDATION=32
+BATCH_SIZE_TRAINING=8
+BATCH_SIZE_VALIDATION=16
 GRADIENT_ACCUMULATION_STEPS=4
 DIST_CHECKPOINT_ROOT_FOLDER="/global/home/users/jonathanngai/calyapo/calyapo/training/checkpoints/${DATASET}"
 DIST_CHECKPOINT_FOLDER="fine-tuned"
-NUM_WORKERS_DATALOADER=4
+NUM_WORKERS_DATALOADER=2
 ONE_GPU=False
 WEIGHT_DECAY=0.1
 GAMMA=0.85

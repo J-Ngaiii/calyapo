@@ -4,14 +4,14 @@
 #SBATCH --account=fc_hartmanl2
 #SBATCH --partition=savio3_gpu
 #SBATCH --nodes=1
-#SBATCH --ntasks=2
+#SBATCH --ntasks=1 # keep as 1
 
 # Processors per task:
 # Eight times the number for A40 in savio3_gpu
 #SBATCH --cpus-per-task=8
 
 #Number of GPUs
-#SBATCH --gres=gpu:A40:2
+#SBATCH --gres=gpu:A40:1 
 #SBATCH --qos=a40_gpu3_normal
 
 # Wall clock limit:
@@ -24,6 +24,8 @@
 # Create the directory specifically named 'slurm' for the #SBATCH output logs
 mkdir -p slurm
 mkdir -p logs
+
+echo "Job started on $(hostname) at $(date)"
 
 # Navigate to your project directory
 cd /global/home/users/jonathanngai/calyapo
@@ -49,50 +51,43 @@ fi
 export TOKENIZERS_PARALLELISM=true
 
 # Distributed Setup
-NPROC_PER_NODE=2                      # Match this to your --gres=gpu count
+NPROC_PER_NODE=1                     # Match this to your --gres=gpu count
 MASTER_PORT=$(expr 10000 + $(echo -n $SLURM_JOBID | tail -c 4)) # Random port to avoid collisions
 
 # Model/Data Params
-# Dynamic Model Selection
+# MODEL_NAME="meta-llama/Llama-2-7b-hf"
+# MODEL_NICKNAME="llama2-7b" 
+
+MODEL_NAME="meta-llama/Llama-3.1-8B"
 MODEL_NICKNAME="llama3.1-8b" 
 
-case $MODEL_NICKNAME in
-  "llama2-7b")
-    MODEL_NAME="meta-llama/Llama-2-7b-hf"
-    ;;
-  "llama3.1-8b")
-    MODEL_NAME="meta-llama/Llama-3.1-8B"
-    ;;
-  "llama3.1-8b-Instruct")
-    MODEL_NAME="meta-llama/Llama-3.1-8B-Instruct"
-    ;;
-  "llama3.2-3b")
-    MODEL_NAME="meta-llama/Llama-3.2-3B"
-    ;;
-  "llama3.2-3b-Instruct")
-    MODEL_NAME="meta-llama/Llama-3.2-3B-Instruct"
-    ;;
-  "llama3.3-70b-Instruct")
-    MODEL_NAME="meta-llama/Llama-3.3-70B-Instruct"
-    ;;
-  "mistral-7b")
-    MODEL_NAME="mistralai/Mistral-7B-v0.3"
-    ;;
-  "qwen2.5-7b-Instruct")
-    MODEL_NAME="Qwen/Qwen2.5-7B-Instruct"
-    ;;
-  *)
-esac
+# MODEL_NAME="meta-llama/Llama-3.1-8B-Instruct"
+# MODEL_NICKNAME="llama3.1-8b-Instruct" 
+
+# MODEL_NAME="meta-llama/Llama-3.2-3B"
+# MODEL_NICKNAME="llama3.2-3b"
+
+# MODEL_NAME="meta-llama/Llama-3.2-3B-Instruct"
+# MODEL_NICKNAME="llama3.2-3b-Instruct"
+
+# MODEL_NAME="meta-llama/Llama-3.3-70B-Instruct"
+# MODEL_NICKNAME="llama3.3-70b-Instruct"
+
+# MODEL_NAME="mistralai/Mistral-7B-v0.3"
+# MODEL_NICKNAME="mistral-7b"
+
+# MODEL_NAME="Qwen/Qwen2.5-7B-Instruct"
+# MODEL_NICKNAME="qwen2.5-7b-Instruct"
 
 DATASET="opinion_school_dataset"
 OUTPUT_DIR="calyapo/training/checkpoints/${DATASET}"
 USE_PEFT=True
-BATCH_SIZE_TRAINING=16
-BATCH_SIZE_VALIDATION=32
+BATCH_SIZE_TRAINING=4
+BATCH_SIZE_VALIDATION=8
 GRADIENT_ACCUMULATION_STEPS=4
 DIST_CHECKPOINT_ROOT_FOLDER="/global/home/users/jonathanngai/calyapo/calyapo/training/checkpoints/${DATASET}"
 DIST_CHECKPOINT_FOLDER="fine-tuned"
-NUM_WORKERS_DATALOADER=4
+NUM_WORKERS_DATALOADER=2
 ONE_GPU=False
 WEIGHT_DECAY=0.1
 GAMMA=0.85
