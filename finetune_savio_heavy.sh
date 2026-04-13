@@ -65,8 +65,8 @@ MASTER_PORT=$(expr 10000 + $(echo -n $SLURM_JOBID | tail -c 4)) # Random port to
 # MODEL_NAME="meta-llama/Llama-2-7b-hf"
 # MODEL_NICKNAME="llama2-7b" 
 
-MODEL_NAME="meta-llama/Llama-3.1-8B"
-MODEL_NICKNAME="llama3.1-8b" 
+# MODEL_NAME="meta-llama/Llama-3.1-8B"
+# MODEL_NICKNAME="llama3.1-8b" 
 
 # MODEL_NAME="meta-llama/Llama-3.1-8B-Instruct"
 # MODEL_NICKNAME="llama3.1-8b-Instruct" 
@@ -74,8 +74,8 @@ MODEL_NICKNAME="llama3.1-8b"
 # MODEL_NAME="meta-llama/Llama-3.2-3B"
 # MODEL_NICKNAME="llama3.2-3b"
 
-# MODEL_NAME="meta-llama/Llama-3.2-3B-Instruct"
-# MODEL_NICKNAME="llama3.2-3b-Instruct"
+MODEL_NAME="meta-llama/Llama-3.2-3B-Instruct"
+MODEL_NICKNAME="llama3.2-3b-Instruct"
 
 # MODEL_NAME="meta-llama/Llama-3.3-70B-Instruct"
 # MODEL_NICKNAME="llama3.3-70b-Instruct"
@@ -95,7 +95,7 @@ GRADIENT_ACCUMULATION_STEPS=4
 DIST_CHECKPOINT_ROOT_FOLDER="/global/home/users/jonathanngai/calyapo/calyapo/training/checkpoints/${DATASET}"
 DIST_CHECKPOINT_FOLDER="fine-tuned"
 NUM_WORKERS_DATALOADER=2
-ONE_GPU=Flase # only use for debugging
+ONE_GPU=False # only use for debugging
 WEIGHT_DECAY=0.1
 GAMMA=0.85
 LR=1e-5

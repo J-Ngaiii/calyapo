@@ -38,7 +38,7 @@ def generate_timestamped_folder(cfg) -> Path:
     """
     timestamp = datetime.now().strftime("%Y-%m-%d-%I-%M-%S%p")
     folder_name = (
-        f"wd{cfg.model_nickname}_"
+        f"{cfg.model_nickname}_"
         f"wd{cfg.weight_decay}_"
         f"gam{cfg.gamma}_"
         f"lr{cfg.lr}_"
