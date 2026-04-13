@@ -1,4 +1,4 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Iterable
 from collections import defaultdict
 
 from calyapo.data_preprocessing.funcs.raw_cleaners import * 
@@ -17,7 +17,15 @@ class SplitHandler:
     """
     NAME = 'Split Handler'
 
-    def __init__(self, train_plan: str, train_ratio: float = None, val_ratio: float = None, test_ratio: float = None, seed: int = 42):
+    def __init__(
+        self, 
+        train_plan: str, 
+        subproportions: Iterable[float] = (0.1, 0.2, 0.5, 0.7), 
+        train_ratio: float = None, 
+        val_ratio: float = None, 
+        test_ratio: float = None, 
+        seed: int = 42
+    ):
         
         
         self.train_plan = train_plan
@@ -29,6 +37,7 @@ class SplitHandler:
         self.ques_split_varying = self.plan_config['question_varies_by_split']
         self.datasets = self.plan_config['datasets']
         self.reduction_modifier = self.plan_config.get('reduction_modifier', None)
+        self.subproportions = subproportions
         self.seed = seed
 
         self.training_ratios = {
@@ -145,7 +154,6 @@ class SplitHandler:
                 if verbose: print(f"(Split Handler | Pre-Combining) No processed data found in paths. Built package for '{dataset_name}' from scratch")
             outPack['dataset_packages'][dataset_name] = package
         return outPack
-            
     
     def combine_datasets(self, package: DataPackage = None, save: bool = False, debug: bool = False, verbose: bool = False):
         """
@@ -154,8 +162,32 @@ class SplitHandler:
         Handles for automatic file path checking if package is none.
         """
         if package is None or package['dataset_packages'] is None:
-            if verbose: print(f"(Split Handler) no package passed in memory, calling SplitHandler precombiner")
-            package = self.precombiner(save, debug, verbose)
+            if verbose: print(f"(Split Handler | Combining Datasets) no package passed in memory, calling SplitHandler precombiner")
+            package = self.precombiner(save=save, debug=debug, verbose=verbose)
+        else:
+            if verbose: print(f"(Split Handler | Combining Datasets) received package passed in memory")
         out_path = UNIVERSAL_FINAL_FOLDER
-        out_dict = split_combine(package=package, out_path=out_path, save=save, debug=debug, verbose=verbose)       
+        out_pack = split_combine(package=package, out_path=out_path, save=save, debug=debug, verbose=verbose)       
+        return out_pack
+
+    def subproportion_dataset(self, package: DataPackage = None, save: bool = False, debug: bool = False, verbose: bool = False):
+        """
+        Takes it a fully combined dataset of prompts then creates subsamples of just the training dataset. 
+        Eg. given train_plan_train.jsonl --> creates train_plan_train_0.1.jsonl, train_plan_train_0.25.json, etc
+        """
+        if package is None or package['dataset_packages'] is None:
+            if verbose: print(f"(Split Handler | Subproportions) no package passed in memory, calling SplitHandler combine_datasets")
+            package = self.combine_datasets(save=save, debug=debug, verbose=verbose)
+        else:
+            if verbose: print(f"(Split Handler | Subproportions) received package passed in memory")
+        out_path = UNIVERSAL_FINAL_FOLDER
+        out_dict = subdivide_training_set(
+            package=package, 
+            subproportions=self.subproportions, 
+            out_path=out_path, 
+            seed=self.seed, 
+            save=save, 
+            debug=debug, 
+            verbose=verbose
+        )       
         return out_dict

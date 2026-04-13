@@ -57,7 +57,6 @@ class ideology_to_trump_dataset (calyapo_dataset_config):
     # ideology_to_trump_test.jsonl' is NOT included in this config.
     # it stays hidden until you run the final inference script.
 
-
 @dataclass
 class ideology_to_ideology_dataset (calyapo_dataset_config):
     dataset: str = "ideo2ideo" # override parent class
@@ -73,7 +72,7 @@ class presidents_to_abortion_dataset (calyapo_dataset_config):
 
 @dataclass
 class opinion_school_dataset (calyapo_dataset_config):
-    dataset: str = "test_plan_dataset" 
+    dataset: str = "opinion_school_dataset" 
     train_split: str = f"{str(UNIVERSAL_FINAL_FOLDER)}/opinion_school_train.jsonl"
     test_split: str = f"{str(UNIVERSAL_FINAL_FOLDER)}/opinion_school_val.jsonl"
     predict_eos: bool = True

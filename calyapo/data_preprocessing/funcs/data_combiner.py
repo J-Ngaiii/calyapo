@@ -1,7 +1,7 @@
 import json
 import os
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Iterable
 
 from calyapo.configurations.data_map_config import TRAIN_PLANS, VARLABEL_DESC
 from calyapo.configurations.config import UNIVERSAL_FINAL_FOLDER, UNIVERSAL_NA_FILLER
@@ -102,7 +102,7 @@ def split_combine(
         debug: bool = False, 
         verbose: bool = True
     ):
-    train_data = []
+    train_data = [] # list of {prompt : completion} dictionaries
     val_data = []
     test_data = []
         
@@ -127,9 +127,34 @@ def split_combine(
         save_jsonl(val_data, f"{package.train_plan}_val.jsonl", out_path, verbose)
         save_jsonl(test_data, f"{package.train_plan}_test.jsonl", out_path, verbose)
 
-    return {
-        "train": train_data,
-        "val": val_data,
-        "test": test_data
-    }
+    out_pack = DataPackage(package.dataset_name, package.train_plan, package.time_period)
+    out_pack['train'] = train_data
+    out_pack['val'] = val_data
+    out_pack['test'] = test_data
+    return out_pack
+
+def subdivide_training_set(
+        package: DataPackage, 
+        subproportions: Iterable[float], 
+        out_path: str = None, 
+        seed: int = 42, 
+        save: bool = True, 
+        debug: bool = False, 
+        verbose: bool = True
+    ):
+    out_pack = DataPackage(package.dataset_name, package.train_plan, package.time_period)
+    np.random.default_rng(seed)
+
+    base_train_set = package['train']  # List of {prompt: completion}
+    train_size_total = len(base_train_set)
+    for proportion in subproportions:
+        indices = rng.choice(len(val_valid_indivs), size=int(train_size_total * proportion), replace=False)
+        train_subproportion = [base_train_set[i] for i in indices]
+        out_pack[f"train_{str(proportion)}"] = train_subproportion
+
+        if save:
+            assert out_path is not None, f"(subdivide_training_set | WARNING) Cannot have no out_path if saving."
+            save_jsonl(train_subproportion, f"{package.train_plan}_train_{str(proportion)}.jsonl", out_path, verbose)
+
+    return out_pack
 

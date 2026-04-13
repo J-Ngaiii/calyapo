@@ -117,6 +117,7 @@ if __name__ == "__main__":
     parser.add_argument("--model_type", type=str, choices=['lora', 'base'], default='train')
     parser.add_argument("--split", type=str, choices=['train', 'val', 'test'], default='train')
     parser.add_argument("--debug", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--verbose", action=argparse.BooleanOptionalAction, default=True)
     
     args = parser.parse_args()
     
