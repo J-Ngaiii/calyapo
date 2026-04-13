@@ -65,8 +65,8 @@ MASTER_PORT=$(expr 10000 + $(echo -n $SLURM_JOBID | tail -c 4)) # Random port to
 # MODEL_NAME="meta-llama/Llama-2-7b-hf"
 # MODEL_NICKNAME="llama2-7b" 
 
-# MODEL_NAME="meta-llama/Llama-3.1-8B"
-# MODEL_NICKNAME="llama3.1-8b" 
+MODEL_NAME="meta-llama/Llama-3.1-8B"
+MODEL_NICKNAME="llama3.1-8b" 
 
 # MODEL_NAME="meta-llama/Llama-3.1-8B-Instruct"
 # MODEL_NICKNAME="llama3.1-8b-Instruct" 

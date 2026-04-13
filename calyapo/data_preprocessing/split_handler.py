@@ -17,7 +17,7 @@ class SplitHandler:
     """
     NAME = 'Split Handler'
 
-    def __init__(self, train_plan: str, train_ratio: float = None, val_ratio: float = None, test_ratio: float = None):
+    def __init__(self, train_plan: str, train_ratio: float = None, val_ratio: float = None, test_ratio: float = None, seed: int = 42):
         
         
         self.train_plan = train_plan
@@ -29,7 +29,8 @@ class SplitHandler:
         self.ques_split_varying = self.plan_config['question_varies_by_split']
         self.datasets = self.plan_config['datasets']
         self.reduction_modifier = self.plan_config.get('reduction_modifier', None)
-        
+        self.seed = seed
+
         self.training_ratios = {
             'train' : float(train_ratio), 
             'val' : float(val_ratio), 
@@ -64,7 +65,17 @@ class SplitHandler:
             if verbose: print(f"(Split Handler | Splitting) Processing {len(interim_data)} DataFrames passed in-memory.")
         
         out_path = DATA_PATHS[dataset_name]['processed']
-        out_pack = split_questions(data=interim_data, dataset_name=dataset_name, train_plan=self.train_plan, reduction_modifier=self.reduction_modifier, out_path=out_path, save=save, debug=debug, verbose=verbose)
+        out_pack = split_questions(
+            data=interim_data, 
+            dataset_name=dataset_name, 
+            train_plan=self.train_plan, 
+            reduction_modifier=self.reduction_modifier, 
+            out_path=out_path, 
+            seed=self.seed, 
+            save=save, 
+            debug=debug, 
+            verbose=verbose
+        )
         # split on questions compiles data from all time periods per dataset
         # train plan is written onto out_pack
         return out_pack
@@ -100,6 +111,7 @@ class SplitHandler:
             train_setting=self.train_setting, 
             valid_indiv_setting=self.valid_indiv_setting,
             out_path=out_path, 
+            seed=self.seed, 
             save=save, 
             debug=debug, 
             verbose=verbose

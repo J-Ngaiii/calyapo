@@ -114,6 +114,7 @@ def split_questions(
         train_plan: str, 
         reduction_modifier: float = None, 
         out_path: str = None, 
+        seed: int = 42, 
         save: bool = True, 
         debug: bool = False, 
         verbose: bool = False
@@ -131,7 +132,7 @@ def split_questions(
     if verbose: print(f"(split_question) recieving '{len(data)}' dataframes")
 
     for df in data:
-        pack = process_csv(data=df, dataset_name=dataset_name, train_plan=train_plan, reduction_modifier=reduction_modifier, debug=debug, verbose=verbose)
+        pack = process_csv(data=df, dataset_name=dataset_name, train_plan=train_plan, reduction_modifier=reduction_modifier, seed=seed, debug=debug, verbose=verbose)
 
         
         if not pack: continue # skip if config missing

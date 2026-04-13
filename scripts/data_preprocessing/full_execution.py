@@ -22,7 +22,8 @@ def main():
         train_plan=args.train_plan, 
         train_ratio=args.train_ratio, 
         val_ratio=args.val_ratio, 
-        test_ratio=args.test_ratio
+        test_ratio=args.test_ratio, 
+        seed=args.seed
     )
     plan_config = TRAIN_PLANS[args.train_plan]
     for dataset in plan_config['datasets']:
