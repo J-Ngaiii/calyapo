@@ -42,6 +42,7 @@ def run_inference(engine_params, sampling_params, split, train_plan, input_path,
 
     if verbose: 
         model_name = engine_params.get('model', 'Unknown')
+        model_nickname = engine_params.get('model_nickname', 'Unknown')
         print(f"\n------------------------Dataset Stats------------------------")
         print(f"Dataset:                 {split}")
         print(f"Number of Datapoints:    {len(raw_data)}")
@@ -80,8 +81,8 @@ def run_inference(engine_params, sampling_params, split, train_plan, input_path,
 
     ts = get_timestamp()
     model_type = "lora" if engine_params.get('enable_lora', False) else "base"
-    results_file = output_folder / Path(model_name) / f"results_{split}_{TP_ABBREVIATIONS[train_plan]}_{model_type}_{ts}.jsonl"
-    config_file = output_folder / Path(model_name) / f"config_{split}_{TP_ABBREVIATIONS[train_plan]}_{model_type}_{ts}.json"
+    results_file = output_folder / Path(model_nickname) / f"results_{split}_{TP_ABBREVIATIONS[train_plan]}_{model_type}_{ts}.jsonl"
+    config_file = output_folder / Path(model_nickname) / f"config_{split}_{TP_ABBREVIATIONS[train_plan]}_{model_type}_{ts}.json"
     full_config = {
         "timestamp": ts,
         "engine_params": engine_params,
@@ -114,8 +115,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fully runs offline inference pipeline.") 
     parser.add_argument("--train_plan", type=str, nargs='?', default='opinion_school', help="Name of training plan to finetune on.")
     parser.add_argument("--adapter_folder", type=str, nargs='?', default=None, help="Folder with safetensor and json.")
-    parser.add_argument("--model_type", type=str, choices=['lora', 'base'], default='train')
-    parser.add_argument("--split", type=str, choices=['train', 'val', 'test'], default='train')
+    parser.add_argument("--model_name", type=str, nargs='?', default=None, help="Full name for model")
+    parser.add_argument("--model_nickname", type=str, nargs='?', default=None, help="Nickname for model")
     parser.add_argument("--debug", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--verbose", action=argparse.BooleanOptionalAction, default=True)
     
@@ -128,11 +129,11 @@ if __name__ == "__main__":
     OUTPUT_FOLDER = Path(f"inference_outputs/{TRAIN_PLAN}")
     LORA_ADAPTER_PATH = Path(f"calyapo/training/checkpoints/{TRAIN_PLAN}_dataset/{args.adapter_folder}")
     
-    USE_LORA = args.model_type.lower() == 'lora'
-    SPLIT = args.split
+    OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
 
     basic_inf_engine_config = {
-        "model": "meta-llama/Llama-2-7b-hf",
+        "model": args.model_name,
+        "model_nickname": args.model_nickname, 
         "quantization": "bitsandbytes",
         "load_format": "bitsandbytes",
         "dtype": "float16",
@@ -152,32 +153,41 @@ if __name__ == "__main__":
         "logprobs": 5 
     }
 
-    if USE_LORA:
-        engine_config = lora_inf_engine_config
-        lora_path = str(LORA_ADAPTER_PATH)
-    else:
-        engine_config = basic_inf_engine_config
-        lora_path = None
+    model_types = ['lora', 'base']
+    dataset_types = ['train', 'val', 'test']
 
-    if SPLIT == 'val':
-        inf_split = "validation"
-        input_path = VAL_PATH
-    elif SPLIT == 'train':
-        inf_split = "training"
-        input_path = TRAIN_PATH
-    elif SPLIT == 'test':
-        inf_split = "test"
-        input_path = TEST_PATH
+    for modtype in model_types:
 
-    OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
+        if modtype == 'lora':
+                engine_config = lora_inf_engine_config
+                lora_path = str(LORA_ADAPTER_PATH)
+        elif modtype == 'base':
+            engine_config = basic_inf_engine_config
+            lora_path = None
+        else:
+            raise ValueError(f"Unkown model type: '{modtype}'")
 
-    run_inference(
-        engine_params=engine_config, 
-        sampling_params=sampling_config, 
-        split=inf_split, 
-        train_plan=args.train_plan, 
-        input_path=input_path,
-        output_folder=OUTPUT_FOLDER, 
-        lora_path=lora_path, 
-        verbose=True
-    )
+        for dattype in dataset_types:
+            
+            if dattype == 'val':
+                inf_split = "validation"
+                input_path = VAL_PATH
+            elif dattype == 'train':
+                inf_split = "training"
+                input_path = TRAIN_PATH
+            elif dattype == 'test':
+                inf_split = "test"
+                input_path = TEST_PATH
+
+            run_inference(
+                engine_params=engine_config, 
+                sampling_params=sampling_config, 
+                split=inf_split, 
+                train_plan=args.train_plan, 
+                input_path=input_path,
+                output_folder=OUTPUT_FOLDER, 
+                lora_path=lora_path, 
+                verbose=True
+            )
+
+    

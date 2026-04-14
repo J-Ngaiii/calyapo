@@ -71,11 +71,11 @@ MASTER_PORT=$(expr 10000 + $(echo -n $SLURM_JOBID | tail -c 4)) # Random port to
 # MODEL_NAME="meta-llama/Llama-3.1-8B-Instruct"
 # MODEL_NICKNAME="llama3.1-8b-Instruct" 
 
-# MODEL_NAME="meta-llama/Llama-3.2-3B"
-# MODEL_NICKNAME="llama3.2-3b"
+MODEL_NAME="meta-llama/Llama-3.2-3B"
+MODEL_NICKNAME="llama3.2-3b"
 
-MODEL_NAME="meta-llama/Llama-3.2-3B-Instruct"
-MODEL_NICKNAME="llama3.2-3b-Instruct"
+# MODEL_NAME="meta-llama/Llama-3.2-3B-Instruct"
+# MODEL_NICKNAME="llama3.2-3b-Instruct"
 
 # MODEL_NAME="meta-llama/Llama-3.3-70B-Instruct"
 # MODEL_NICKNAME="llama3.3-70b-Instruct"
@@ -86,7 +86,7 @@ MODEL_NICKNAME="llama3.2-3b-Instruct"
 # MODEL_NAME="Qwen/Qwen2.5-7B-Instruct"
 # MODEL_NICKNAME="qwen2.5-7b-Instruct"
 
-DATASET="opinion_school_dataset"
+DATASET="presidents_to_abortion_dataset"
 OUTPUT_DIR="calyapo/training/checkpoints/${DATASET}"
 USE_PEFT=True
 BATCH_SIZE_TRAINING=4

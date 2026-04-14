@@ -55,5 +55,22 @@ MASTER_PORT=$(expr 10000 + $(echo -n $SLURM_JOBID | tail -c 4)) # Random port to
 TRAIN_PLAN="presidents_to_abortion"
 ADAPTER_FOLDER="wdllama2-7b_wd0.1_gam0.85_lr1e-05_2026-03-31-01-48-42PM"
 
+# MODEL_NAME="meta-llama/Llama-2-7b-hf"
+# MODEL_NICKNAME="llama2-7b" 
+
+# MODEL_NAME="meta-llama/Llama-3.1-8B"
+# MODEL_NICKNAME="llama3.1-8b" 
+
+# MODEL_NAME="meta-llama/Llama-3.1-8B-Instruct"
+# MODEL_NICKNAME="llama3.1-8b-Instruct" 
+
+MODEL_NAME="meta-llama/Llama-3.2-3B"
+MODEL_NICKNAME="llama3.2-3b"
+
+# MODEL_NAME="meta-llama/Llama-3.2-3B-Instruct"
+# MODEL_NICKNAME="llama3.2-3b-Instruct"
+
 python scripts/llm/offline_inf.py --train_plan=${TRAIN_PLAN} \
     --adapter_folder=${ADAPTER_FOLDER} \
+    --model_name=${MODEL_NAME} \
+    --model_nickname=${MODEL_NICKNAME} \
