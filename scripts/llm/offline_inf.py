@@ -42,7 +42,6 @@ def run_inference(engine_params, sampling_params, split, train_plan, input_path,
 
     if verbose: 
         model_name = engine_params.get('model', 'Unknown')
-        model_nickname = engine_params.get('model_nickname', 'Unknown')
         print(f"\n------------------------Dataset Stats------------------------")
         print(f"Dataset:                 {split}")
         print(f"Number of Datapoints:    {len(raw_data)}")
@@ -81,8 +80,8 @@ def run_inference(engine_params, sampling_params, split, train_plan, input_path,
 
     ts = get_timestamp()
     model_type = "lora" if engine_params.get('enable_lora', False) else "base"
-    results_file = output_folder / Path(model_nickname) / f"results_{split}_{TP_ABBREVIATIONS[train_plan]}_{model_type}_{ts}.jsonl"
-    config_file = output_folder / Path(model_nickname) / f"config_{split}_{TP_ABBREVIATIONS[train_plan]}_{model_type}_{ts}.json"
+    results_file = output_folder / Path(model_name) / f"results_{split}_{TP_ABBREVIATIONS[train_plan]}_{model_type}_{ts}.jsonl"
+    config_file = output_folder / Path(model_name) / f"config_{split}_{TP_ABBREVIATIONS[train_plan]}_{model_type}_{ts}.json"
     full_config = {
         "timestamp": ts,
         "engine_params": engine_params,
@@ -132,8 +131,7 @@ if __name__ == "__main__":
     OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
 
     basic_inf_engine_config = {
-        "model": args.model_name,
-        "model_nickname": args.model_nickname, 
+        "model": args.model_name, 
         "quantization": "bitsandbytes",
         "load_format": "bitsandbytes",
         "dtype": "float16",
