@@ -1,6 +1,6 @@
 #!/bin/bash
 # from https://docs-research-it.berkeley.edu/services/high-performance-computing/user-guide/running-your-jobs/scheduler-examples/
-#SBATCH --job-name=calyapo_finetune_savio 
+#SBATCH --job-name=calyapo_inference_p2a
 #SBATCH --account=fc_hartmanl2
 #SBATCH --partition=savio3_gpu
 #SBATCH --nodes=1
@@ -53,24 +53,36 @@ MASTER_PORT=$(expr 10000 + $(echo -n $SLURM_JOBID | tail -c 4)) # Random port to
 TRAIN_PLAN="presidents_to_abortion"
 MODEL_NAME="meta-llama/Llama-3.1-8B"
 MODEL_NICKNAME="llama3.1-8b"
-ADAPTER_FOLDER="llama3.1-8b_wd0.1_gam0.85_lr1e-05_2026-04-14-01-53-07AM"
+ADAPTER_FOLDER="llama3.1-8b_wd0.1_gam0.85_lr1e-05_2026-04-12-04-58-33PM"
 
 # MODEL_NAME="meta-llama/Llama-3.1-8B-Instruct"
 # MODEL_NICKNAME="llama3.1-8b-Instruct" 
-# ADAPTER_FOLDER="llama3.1-8b-Instruct_wd0.1_gam0.85_lr1e-05_2026-04-14-05-26-04AM"
+# ADAPTER_FOLDER="llama3.1-8b-Instruct_wd0.1_gam0.85_lr1e-05_2026-04-12-04-41-42PM"
 
 # MODEL_NAME="meta-llama/Llama-3.2-3B"
 # MODEL_NICKNAME="llama3.2-3b"
-# ADAPTER_FOLDER="llama3.2-3b_wd0.1_gam0.85_lr1e-05_2026-04-13-04-39-12PM"
+# ADAPTER_FOLDER="llama3.2-3b_wd0.1_gam0.85_lr1e-05_2026-04-13-02-04-15AM"
 
 # MODEL_NAME="meta-llama/Llama-3.2-3B-Instruct"
 # MODEL_NICKNAME="llama3.2-3b-Instruct"
-# ADAPTER_FOLDER="llama3.2-3b-Instruct_wd0.1_gam0.85_lr1e-05_2026-04-13-04-38-50PM"
+# ADAPTER_FOLDER="llama3.2-3b-Instruct_wd0.1_gam0.85_lr1e-05_2026-04-13-02-03-23AM"
 
 # MODEL_NAME="meta-llama/Llama-2-7b-hf"
 # MODEL_NICKNAME="llama2-7b" 
 
+# MODEL_TYPE="base" 
+MODEL_TYPE="lora" 
+# SPLIT="train"
+# SPLIT="val"
+SPLIT="test"
+
+NUM_GPUS=1
+CHUNK_SIZE=2000
+
 python scripts/llm/offline_inf.py --train_plan=${TRAIN_PLAN} \
-    --adapter_folder=${ADAPTER_FOLDER} \
     --model_name=${MODEL_NAME} \
-    --model_nickname=${MODEL_NICKNAME} \
+    --adapter_folder=${ADAPTER_FOLDER} \
+    --model_type=${MODEL_TYPE} \
+    --split=${SPLIT} \
+    --num_gpus=${NUM_GPUS} \
+    --chunk_size=${CHUNK_SIZE} \

@@ -129,7 +129,7 @@ def file_saver(out_path: Path, data: Any, data_type: str, indnt: int = 4, verbos
     
     if verbose: print(f"(File Saver) Results saved to: {out_path}")
 
-def report_path(report_conf: Dict, output_parent: Union[str|Path] = "inference_outputs", time_folder: Union[str|None] = None):
+def report_path(report_conf: Dict, output_parent: Union[str|Path] = "inference_outputs", time_folder: Union[str|Path] = None):
     train_plan: str = report_conf['train_plan']
     report_name: str = report_conf.get('report_name', "plot_package")
     save_file_type: str = report_conf.get('save_file_type', "png")

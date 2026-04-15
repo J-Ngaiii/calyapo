@@ -29,7 +29,7 @@ def load_data(file_path):
                 data.append(json.loads(line))
     return data
 
-def run_inference(engine_params, sampling_params, split, train_plan, input_path, output_folder, lora_path = None, verbose=False):
+def run_inference(engine_params, sampling_params, split, train_plan, input_path, output_folder, chunk_size: int = 2000, lora_path = None, verbose=False):
     if not os.path.exists(input_path):
         raise ValueError(f"Input path '{input_path}' does not exist")
 
@@ -47,11 +47,13 @@ def run_inference(engine_params, sampling_params, split, train_plan, input_path,
         print(f"Number of Datapoints:    {len(raw_data)}")
         print(f"Training Plan:           {train_plan}")
         print(f"Plan using Abbreviation: {TP_ABBREVIATIONS.get(train_plan, 'no abbreviations found')}")
+        print(f"chunk_size:              {chunk_size}")
         print(f"-------------------------------------------------------------")
         
         print(f"\n------------------------Engine Stats------------------------")
         print(f"Initializing vLLM engine for model: '{model_name}'")
         print(f"quantization:            {engine_params.get('quantization', None)}")
+        print(f"num_gpus:                {engine_params.get('tensor_parallel_size', None)}")
         print(f"max_model_len:           {engine_params.get('max_model_len', None)}")
         print(f"max_num_seqs:            {engine_params.get('max_num_seqs', None)}")
         print(f"gpu_memory_utilization:  {engine_params.get('gpu_memory_utilization', None)}")
@@ -74,14 +76,26 @@ def run_inference(engine_params, sampling_params, split, train_plan, input_path,
             raise f"LoRA is enabled but inputted LoRA path '{lora_path}' does not exist"
         print("LoRA model detected")
         lora_request = LoRARequest("my_finetuned_model", 1, lora_path)
-        outputs = llm.generate(prompts, vllm_sampling_config, lora_request=lora_request)
     else:
-        outputs = llm.generate(prompts, vllm_sampling_config)
+        lora_request = None
+ 
+    # chunking logic
+    all_outputs = []
+    for i in range(0, len(prompts), chunk_size):
+        chunk = prompts[i : i + chunk_size]
+        print(f"Processing chunk {i//chunk_size + 1} ({len(chunk)} prompts)...")
+        
+        chunk_outputs = llm.generate(chunk, vllm_sampling_config, lora_request=lora_request)
+        all_outputs.extend(chunk_outputs)
+    outputs = all_outputs
 
     ts = get_timestamp()
     model_type = "lora" if engine_params.get('enable_lora', False) else "base"
-    results_file = output_folder / Path(model_name) / f"results_{split}_{TP_ABBREVIATIONS[train_plan]}_{model_type}_{ts}.jsonl"
-    config_file = output_folder / Path(model_name) / f"config_{split}_{TP_ABBREVIATIONS[train_plan]}_{model_type}_{ts}.json"
+    save_dir = output_folder / Path(model_name)
+    os.makedirs(save_dir, exist_ok=True)
+
+    results_file = save_dir / f"results_{split}_{TP_ABBREVIATIONS[train_plan]}_{model_type}_{ts}.jsonl"
+    config_file = save_dir / f"config_{split}_{TP_ABBREVIATIONS[train_plan]}_{model_type}_{ts}.json"
     full_config = {
         "timestamp": ts,
         "engine_params": engine_params,
@@ -113,9 +127,12 @@ def run_inference(engine_params, sampling_params, split, train_plan, input_path,
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fully runs offline inference pipeline.") 
     parser.add_argument("--train_plan", type=str, nargs='?', default='opinion_school', help="Name of training plan to finetune on.")
+    parser.add_argument("--model_name", type=str, nargs='?',  help="Name of model to finetune on.")
     parser.add_argument("--adapter_folder", type=str, nargs='?', default=None, help="Folder with safetensor and json.")
-    parser.add_argument("--model_name", type=str, nargs='?', default=None, help="Full name for model")
-    parser.add_argument("--model_nickname", type=str, nargs='?', default=None, help="Nickname for model")
+    parser.add_argument("--model_type", type=str, choices=['lora', 'base'], default='train')
+    parser.add_argument("--split", type=str, choices=['train', 'val', 'test'], default='train')
+    parser.add_argument("--num_gpus", type=int, default=1)
+    parser.add_argument("--chunk_size", type=int, default=2000)
     parser.add_argument("--debug", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--verbose", action=argparse.BooleanOptionalAction, default=True)
     
@@ -128,16 +145,18 @@ if __name__ == "__main__":
     OUTPUT_FOLDER = Path(f"inference_outputs/{TRAIN_PLAN}")
     LORA_ADAPTER_PATH = Path(f"calyapo/training/checkpoints/{TRAIN_PLAN}_dataset/{args.adapter_folder}")
     
-    OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
+    USE_LORA = args.model_type.lower() == 'lora'
+    SPLIT = args.split
 
     basic_inf_engine_config = {
-        "model": args.model_name, 
+        "model": args.model_name,
+        "tensor_parallel_size": args.num_gpus, 
         "quantization": "bitsandbytes",
         "load_format": "bitsandbytes",
         "dtype": "float16",
         "max_model_len": 212, # prompts are not that long
         "max_num_seqs": 96,
-        "gpu_memory_utilization": 0.85,
+        "gpu_memory_utilization": 0.75,
         "enforce_eager": True,
         "trust_remote_code": True, 
         "seed": 42
@@ -151,41 +170,33 @@ if __name__ == "__main__":
         "logprobs": 5 
     }
 
-    model_types = ['lora', 'base']
-    dataset_types = ['train', 'val', 'test']
+    if USE_LORA:
+        engine_config = lora_inf_engine_config
+        lora_path = str(LORA_ADAPTER_PATH)
+    else:
+        engine_config = basic_inf_engine_config
+        lora_path = None
 
-    for modtype in model_types:
+    if SPLIT == 'val':
+        inf_split = "validation"
+        input_path = VAL_PATH
+    elif SPLIT == 'train':
+        inf_split = "training"
+        input_path = TRAIN_PATH
+    elif SPLIT == 'test':
+        inf_split = "test"
+        input_path = TEST_PATH
 
-        if modtype == 'lora':
-                engine_config = lora_inf_engine_config
-                lora_path = str(LORA_ADAPTER_PATH)
-        elif modtype == 'base':
-            engine_config = basic_inf_engine_config
-            lora_path = None
-        else:
-            raise ValueError(f"Unkown model type: '{modtype}'")
+    OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
 
-        for dattype in dataset_types:
-            
-            if dattype == 'val':
-                inf_split = "validation"
-                input_path = VAL_PATH
-            elif dattype == 'train':
-                inf_split = "training"
-                input_path = TRAIN_PATH
-            elif dattype == 'test':
-                inf_split = "test"
-                input_path = TEST_PATH
-
-            run_inference(
-                engine_params=engine_config, 
-                sampling_params=sampling_config, 
-                split=inf_split, 
-                train_plan=args.train_plan, 
-                input_path=input_path,
-                output_folder=OUTPUT_FOLDER, 
-                lora_path=lora_path, 
-                verbose=True
-            )
-
-    
+    run_inference(
+        engine_params=engine_config, 
+        sampling_params=sampling_config, 
+        split=inf_split, 
+        train_plan=args.train_plan, 
+        input_path=input_path,
+        output_folder=OUTPUT_FOLDER, 
+        chunk_size=args.chunk_size, 
+        lora_path=lora_path, 
+        verbose=True
+    )
