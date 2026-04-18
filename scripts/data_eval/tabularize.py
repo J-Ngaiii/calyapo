@@ -159,53 +159,43 @@ def parse_inference_data(results_path, config_path, verbose: bool = False):
 
     return dataset
 
-def main(train_plan: str, out_path: Union[str|Path], sub_folder: str = None, save: bool = False, verbose: bool = False, debug: bool = False):
-    base_data_paths = get_base_data_path(train_plan=train_plan, verbose=verbose)
+def main(train_plan: str, calyapo_data: dict, sub_folder: str = None, verbose: bool = False):
+    """
+    Modified to take calyapo_data as an argument and update it in-place.
+    """
+    # Get paths for this specific model's inference results
     inf_data_paths = get_inf_data_path(train_plan=train_plan, sub_folder=sub_folder, verbose=verbose)
 
-    calyapo_data = {
-        'train' : parse_calyapo_data(base_data_paths['train']), 
-        'val' : parse_calyapo_data(base_data_paths['val']), 
-        'test' : parse_calyapo_data(base_data_paths['test'])
-    }
-
     for k, v in inf_data_paths.items():
+        if not v: continue # Skip if results/config are missing
+        
         inf_dat = parse_inference_data(**v, verbose=verbose)
-        model_name = str(inf_dat['model_name'][0])
+        # Clean model name for column headers (remove slashes/paths)
+        model_id = str(inf_dat['model_name'][0]).split('/')[-1]
         split, model_type = k.split('_')
 
         base_dat = calyapo_data[split]
-        assert len(base_dat) == len(inf_dat), f"Length mismatch between base and inference datasets."
-        assert all(base_dat['answer'] == inf_dat['true_value']), f"True values do not match between base and inference datasets."
-
-        base_dat[f'{model_name}_{model_type}_correct'] = inf_dat['prediction_correct']
+        
+        # Safety checks
+        assert len(base_dat) == len(inf_dat), f"Length mismatch for {model_id} on {split} split."
+        
+        # Add the specific columns for this model
+        base_dat[f'{model_id}_{model_type}_pred'] = inf_dat['model_prediction'].values
+        base_dat[f'{model_id}_{model_type}_correct'] = inf_dat['prediction_correct'].values
 
         calyapo_data[split] = base_dat
-        
-
-    if save:
-        file_saver(out_path=Path(out_path) / f"{train_plan}_train_eval_data.csv", data=calyapo_data['train'], data_type='csv', verbose=verbose)
-        file_saver(out_path=Path(out_path) / f"{train_plan}_val_eval_data.csv", data=calyapo_data['val'], data_type='csv', verbose=verbose)
-        file_saver(out_path=Path(out_path) / f"{train_plan}_test_eval_data.csv", data=calyapo_data['test'], data_type='csv', verbose=verbose)
-
+    
+    return calyapo_data
 
 if __name__ == "__main__":
-    # --- Implementation ---
-    # Replace 'data.jsonl' with your actual filename
-    # df = parse_calyapo_data('data.jsonl')
-
-    # Example of how to do a cross-tab once you have the 'df':
-    # ct = pd.crosstab(df['Party Identity'], df['answer'])
-    # print(ct)
     parser = argparse.ArgumentParser(description="Runs analysis of offline inference data.") 
-    parser.add_argument("--train_plan", type=str, nargs='?', default='opinion_school', help="Name of training plan to finetune on.")
+    parser.add_argument("--train_plan", type=str, nargs='?', default='opinion_school', help="Name of training plan.")
     parser.add_argument("--save", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--verbose", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--debug", action=argparse.BooleanOptionalAction, default=True)
-
     args = parser.parse_args()
 
-    OUTPATH_FOLDER = Path("evaluation_datasets")
+    OUTPATH_FOLDER = Path("inference_outputs") / Path(args.train_plan) / Path("evaluation_datasets")
     LLAMA_SUBFOLDER = "meta-llama"
     LLAMA_MODELS_FINETUNED = [
         'Llama-3.1-8B', 
@@ -214,6 +204,32 @@ if __name__ == "__main__":
         'Llama-3.2-3B-Instruct', 
     ]
 
-    for model_name in LLAMA_MODELS_FINETUNED:
-        main(train_plan = args.train_plan, out_path = OUTPATH_FOLDER, sub_folder = Path(LLAMA_SUBFOLDER) / model_name, save = args.save, verbose = args.verbose, debug = args.debug)
+    # 1. LOAD BASE DATA ONCE
+    base_data_paths = get_base_data_path(train_plan=args.train_plan, verbose=args.verbose)
+    all_results = {
+        'train' : parse_calyapo_data(base_data_paths['train']), 
+        'val' : parse_calyapo_data(base_data_paths['val']), 
+        'test' : parse_calyapo_data(base_data_paths['test'])
+    }
 
+    # 2. ACCUMULATE COLUMNS FOR ALL MODELS
+    for model_name in LLAMA_MODELS_FINETUNED:
+        print(f"--- Processing Model: {model_name} ---")
+        all_results = main(
+            train_plan = args.train_plan, 
+            calyapo_data = all_results, 
+            sub_folder = Path(LLAMA_SUBFOLDER) / model_name, 
+            verbose = args.verbose
+        )
+
+    # 3. SAVE ONCE AFTER LOOP
+    if args.save:
+        OUTPATH_FOLDER.mkdir(parents=True, exist_ok=True)
+        for split in ['train', 'val', 'test']:
+            fname = f"{args.train_plan}_{split}_combined_eval.csv"
+            file_saver(
+                out_path=OUTPATH_FOLDER / fname, 
+                data=all_results[split], 
+                data_type='csv', 
+                verbose=args.verbose
+            )
