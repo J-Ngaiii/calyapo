@@ -2,59 +2,99 @@ import pandas as pd
 from pathlib import Path
 import argparse
 import os
-
-# Importing your specific persistence utilities
 from calyapo.utils.persistence import file_loader, file_saver
 
 def run_crosstab_analysis(train_plan: str, data_folder: str, output_folder: str, verbose: bool = False):
+    """
+    Loads combined eval datasets with following schema: 
+        dataset_date (int): date encoding from calyapo data transformation pipeline	
+        topic (str): variable_label from calyapo data transformation pipeline
+        answer (char): correct answer choice
+        Age	(strP): age range of respondent as encoded in calyapo transformation pipeline
+        Party Identity (str): party id of respondent as encoded in calyapo transformation pipeline	
+        Political Ideology (str): political ideology of respondent as encoded in calyapo transformation pipeline
+        Race (str): race of respondent as encoded in calyapo transformation pipeline
+        Gender Identity	(str): gender of respondent as encoded in calyapo transformation pipeline
+        Biological Sex	(str): sex of respondent as encoded in calyapo transformation pipeline
+        Residence Urbanicity (str): enviornment of respondent, varies between urban, suburb and rural.
+        Marital Status (str): Marital status of respondent as encoded in calyapo transformation pipeline
+
+        Llama-3.1-8B_lora_pred (char): Prediction of model for that respondent
+        Llama-3.1-8B_lora_correct (bool): Correctness of model prediction for that respondent 
+        Llama-3.1-8B_base_pred (char): Prediction of model for that respondent	
+        Llama-3.1-8B_base_correct (bool): Correctness of model prediction for that respondent 	
+        Llama-3.1-8B-Instruct_lora_pred (char): Prediction of model for that respondent	
+        Llama-3.1-8B-Instruct_lora_correct (bool): Correctness of model prediction for that respondent 	
+        Llama-3.1-8B-Instruct_base_pred (char): Prediction of model for that respondent	
+        Llama-3.1-8B-Instruct_base_correct (bool): Correctness of model prediction for that respondent 
+
+        Llama-3.2-3B_lora_pred (char): Prediction of model for that respondent	
+        Llama-3.2-3B_lora_correct (bool): Correctness of model prediction for that respondent 	
+        Llama-3.2-3B_base_pred (char): Prediction of model for that respondent	
+        Llama-3.2-3B_base_correct (bool): Correctness of model prediction for that respondent 	
+        Llama-3.2-3B-Instruct_lora_pred (char): Prediction of model for that respondent	
+        Llama-3.2-3B-Instruct_lora_correct (bool): Correctness of model prediction for that respondent 	
+        Llama-3.2-3B-Instruct_base_pred (char): Prediction of model for that respondent	
+        Llama-3.2-3B-Instruct_base_correct (bool): Correctness of model prediction for that respondent 
+
+    Assembles crosstab responses to all unique topics found in the dataset based on demographic cols. 
+    """
     base_in_path = Path(data_folder)
     base_out_path = Path(output_folder) / "crosstabs"
-    
-    # Define splits to process
+
     splits = ['train', 'val', 'test']
     
     for split in splits:
-        file_name = f"{train_plan}_{split}_eval_data.csv"
+        file_name = f"{train_plan}_{split}_combined_eval.csv"
         csv_path = base_in_path / file_name
         
         if not csv_path.exists():
             if verbose: print(f"Skipping {split}: {csv_path} not found.")
             continue
 
-        # Use your file_loader utility
         df = file_loader(in_path=csv_path, data_type='csv', verbose=verbose)
 
-        # 1. Identify Model Columns and Demographic Columns
-        # Models are identified by the '_correct' suffix from your previous script
-        model_cols = [c.replace('_correct', '') for c in df.columns if c.endswith('_correct')]
-        
-        # Demographics: exclude meta-data and the 'correct' flag columns
+        # to identify demographics exclude meta-data and the model cols
         exclude = ['dataset_date', 'topic', 'answer', 'Question', 'index', 'model_name'] + \
-                  [c for c in df.columns if c.endswith('_correct')]
+                  [c for c in df.columns if c.endswith('_correct') or c.endswith('_pred')]
         demog_cols = [c for c in df.columns if c not in exclude and not c.startswith('Unnamed')]
 
-        unique_topics = df['topic'].unique()
+        unique_var_labels = df['topic'].unique() # collects all survey questions asked under the current split in this training plan
+        model_pred_cols = sorted([c for c in df.columns if c.endswith('_pred')]) # identify model and demographic cols --> so we can crosstab on them later
 
-        for topic in unique_topics:
-            # Create a clean string for the filename from the topic name
-            safe_topic = "".join([c if c.isalnum() else "_" for c in topic])
-            topic_df = df[df['topic'] == topic]
+        if verbose:
+            print(f"Demographic columns identified: {demog_cols}")
+            print(f"Topic Variable Labels identified: {list(unique_var_labels)}")
+            print(f"Model Prediction cols identified: {model_pred_cols}")
+        for topic_var_label in unique_var_labels:
+            topic_label = "".join([c if c.isalnum() else "_" for c in topic_var_label]) # retain characters that are alphanumeric, otherwise replace with underscore so we can always construct a file name
+            topic_df = df[df['topic'] == topic_var_label] # filter out to rows pertinent to just that variable label
 
             for demog in demog_cols:
-                # We create a crosstab showing respondent answers normalized by demographic group
-                # This shows: "Of [Demog X], what % chose A, B, C, etc."
-                ct_df = pd.crosstab(topic_df[demog], topic_df['answer'], normalize='index')
+                # calculate the true proportions first
+                base_ct = pd.crosstab(topic_df[demog], topic_df['answer'], normalize='index')
+                base_ct = (base_ct * 100).round(2)
+                base_ct.columns = [f"true_{c}" for c in base_ct.columns] # mark the crosstab col values corresponding to true proportions accordingly
                 
-                # Convert to percentage for readability before saving
-                ct_df = (ct_df * 100).round(2)
+                # list to hold all DataFrames for this specific demographic
+                all_cts = [base_ct]
 
-                # Construct output path: /output/plan/crosstabs/split/topic_by_demog.csv
-                save_path = base_out_path / split / f"{safe_topic}" / f"by_{demog}.csv"
-                
-                # Use your file_saver utility
+                for mcol in model_pred_cols:
+                    model_name = mcol.replace('_pred', '')
+                    
+                    # calculate model crosstab proportions
+                    m_ct = pd.crosstab(topic_df[demog], topic_df[mcol], normalize='index')
+                    m_ct = (m_ct * 100).round(2)
+                    m_ct.columns = [f"{model_name}_{c}" for c in m_ct.columns] # mark accordingly
+                    
+                    all_cts.append(m_ct)
+
+                # concatenate everything horizontally along rows 
+                master_ct = pd.concat(all_cts, axis=1)
+                combined_save_path = base_out_path / split / f"{topic_label}" / f"by_{demog}_comparison.csv"
                 file_saver(
-                    out_path=save_path, 
-                    data=ct_df.reset_index(), # reset_index ensures the demog label is a column, not just an index
+                    out_path=combined_save_path, 
+                    data=master_ct.reset_index(),
                     data_type='csv', 
                     verbose=verbose
                 )

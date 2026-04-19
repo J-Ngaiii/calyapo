@@ -5,8 +5,43 @@ import seaborn as sns
 import numpy as np
 from pathlib import Path
 
+from calyapo.utils.persistence import file_loader, file_saver
+
 def load_evaluation_datasets(folder_path, train_plan):
-    """Loads the train, val, and test combined CSVs into a dictionary."""
+    """
+    Loads the train, val, and test combined CSVs into a dictionary.
+
+    Combined eval datasets have the following schema: 
+        dataset_date (int): date encoding from calyapo data transformation pipeline	
+        topic (str): variable_label from calyapo data transformation pipeline
+        answer (char): correct answer choice
+        Age	(strP): age range of respondent as encoded in calyapo transformation pipeline
+        Party Identity (str): party id of respondent as encoded in calyapo transformation pipeline	
+        Political Ideology (str): political ideology of respondent as encoded in calyapo transformation pipeline
+        Race (str): race of respondent as encoded in calyapo transformation pipeline
+        Gender Identity	(str): gender of respondent as encoded in calyapo transformation pipeline
+        Biological Sex	(str): sex of respondent as encoded in calyapo transformation pipeline
+        Residence Urbanicity (str): enviornment of respondent, varies between urban, suburb and rural.
+        Marital Status (str): Marital status of respondent as encoded in calyapo transformation pipeline
+
+        Llama-3.1-8B_lora_pred (char): Prediction of model for that respondent
+        Llama-3.1-8B_lora_correct (bool): Correctness of model prediction for that respondent 
+        Llama-3.1-8B_base_pred (char): Prediction of model for that respondent	
+        Llama-3.1-8B_base_correct (bool): Correctness of model prediction for that respondent 	
+        Llama-3.1-8B-Instruct_lora_pred (char): Prediction of model for that respondent	
+        Llama-3.1-8B-Instruct_lora_correct (bool): Correctness of model prediction for that respondent 	
+        Llama-3.1-8B-Instruct_base_pred (char): Prediction of model for that respondent	
+        Llama-3.1-8B-Instruct_base_correct (bool): Correctness of model prediction for that respondent 
+
+        Llama-3.2-3B_lora_pred (char): Prediction of model for that respondent	
+        Llama-3.2-3B_lora_correct (bool): Correctness of model prediction for that respondent 	
+        Llama-3.2-3B_base_pred (char): Prediction of model for that respondent	
+        Llama-3.2-3B_base_correct (bool): Correctness of model prediction for that respondent 	
+        Llama-3.2-3B-Instruct_lora_pred (char): Prediction of model for that respondent	
+        Llama-3.2-3B-Instruct_lora_correct (bool): Correctness of model prediction for that respondent 	
+        Llama-3.2-3B-Instruct_base_pred (char): Prediction of model for that respondent	
+        Llama-3.2-3B-Instruct_base_correct (bool): Correctness of model prediction for that respondent 
+    """
     splits = ['train', 'val', 'test']
     data = {}
     for split in splits:
@@ -16,22 +51,22 @@ def load_evaluation_datasets(folder_path, train_plan):
         if not file_path.exists():
             raise FileNotFoundError(f"Missing expected CSV: {file_path}")
             
-        data[split] = pd.read_csv(file_path)
+        data[split] = file_loader(in_path=file_name, data_type='csv')
     return data
 
 def get_accuracy_report(all_results, model_names):
-    """Aggregates accuracy metrics for all models across splits."""
+    """
+    Aggregates accuracy metrics for all models across traun, val and test splits.
+    """
     report_list = []
     splits = ['train', 'val', 'test']
     
     for model in model_names:
         for split in splits:
             df = all_results[split]
-            # Match columns from tabularize step
             base_col = f"{model}_base_correct"
             lora_col = f"{model}_lora_correct"
             
-            # Calculate and append Base stats
             if base_col in df.columns:
                 report_list.append({
                     'Model_Name': model,
@@ -40,7 +75,6 @@ def get_accuracy_report(all_results, model_names):
                     'Accuracy': df[base_col].mean()
                 })
             
-            # Calculate and append LoRA stats
             if lora_col in df.columns:
                 report_list.append({
                     'Model_Name': model,
@@ -48,12 +82,15 @@ def get_accuracy_report(all_results, model_names):
                     'Type': 'LORA',
                     'Accuracy': df[lora_col].mean()
                 })
+    
+    # creates up to 24 entries (4 llama models base and lora versions each getting an entry for each of the three splits)
     return pd.DataFrame(report_list)
 
 def plot_performance(df, save_path=None):
-    """Renders 2x2 grid using the Orange/DodgerBlue palette."""
+    """
+    Renders 2x2 grid using the Orange/DodgerBlue palette.
+    """
     sns.set_style("whitegrid")
-    # Exact palette from your JSON script
     palette = {"LORA": "orange", "BASE": "dodgerblue"}
     
     models = df['Model_Name'].unique()
@@ -64,7 +101,6 @@ def plot_performance(df, save_path=None):
         ax = axes[i]
         model_df = df[df['Model_Name'] == model]
         
-        # Using seaborn barplot for consistent styling
         bar = sns.barplot(
             data=model_df, 
             x="Split", 
@@ -75,11 +111,9 @@ def plot_performance(df, save_path=None):
             alpha=0.8
         )
         
-        ax.set_title(f"Performance: {model}", fontsize=14, fontweight='bold')
-        ax.set_ylim(0, 1.05)
+        ax.set_title(f"Performance: {model}")
         ax.set_ylabel("Accuracy")
         
-        # Add labels on top of bars
         for container in ax.containers:
             ax.bar_label(container, fmt='%.3f', padding=3)
             
@@ -107,7 +141,6 @@ if __name__ == "__main__":
         'Llama-3.2-3B-Instruct'
     ]
 
-    # Paths based on your requirements
     INPUT_FOLDER = Path("inference_outputs") / args.train_plan / "evaluation_datasets"
     OUTPUT_FOLDER = Path("inference_outputs") / args.train_plan / "reports"
     SAVE_FILE = OUTPUT_FOLDER / f"{args.train_plan}_model_comparison_bars.png"
