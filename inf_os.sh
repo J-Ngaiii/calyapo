@@ -58,13 +58,13 @@ MASTER_PORT=$(expr 10000 + $(echo -n $SLURM_JOBID | tail -c 4)) # Random port to
 
 # Model/Data Params for opinion_school
 TRAIN_PLAN="opinion_school"
-# MODEL_NAME="meta-llama/Llama-3.1-8B"
-# MODEL_NICKNAME="llama3.1-8b"
-# ADAPTER_FOLDER="llama3.1-8b_wd0.1_gam0.85_lr1e-05_2026-04-12-04-58-33PM"
+MODEL_NAME="meta-llama/Llama-3.1-8B"
+MODEL_NICKNAME="llama3.1-8b"
+ADAPTER_FOLDER="llama3.1-8b_wd0.1_gam0.85_lr1e-05_2026-04-12-04-58-33PM"
 
-MODEL_NAME="meta-llama/Llama-3.1-8B-Instruct"
-MODEL_NICKNAME="llama3.1-8b-Instruct" 
-ADAPTER_FOLDER="llama3.1-8b-Instruct_wd0.1_gam0.85_lr1e-05_2026-04-12-04-41-42PM"
+# MODEL_NAME="meta-llama/Llama-3.1-8B-Instruct"
+# MODEL_NICKNAME="llama3.1-8b-Instruct" 
+# ADAPTER_FOLDER="llama3.1-8b-Instruct_wd0.1_gam0.85_lr1e-05_2026-04-12-04-41-42PM"
 
 # MODEL_NAME="meta-llama/Llama-3.2-3B"
 # MODEL_NICKNAME="llama3.2-3b"
@@ -79,9 +79,9 @@ ADAPTER_FOLDER="llama3.1-8b-Instruct_wd0.1_gam0.85_lr1e-05_2026-04-12-04-41-42PM
 
 MODEL_TYPE="base" 
 # MODEL_TYPE="lora" 
-SPLIT="train"
+# SPLIT="train"
 # SPLIT="val"
-# SPLIT="test"
+SPLIT="test"
 
 NUM_GPUS=1
 CHUNK_SIZE=2000

@@ -27,23 +27,20 @@ def flatten_data_to_llama_format(raw_data_list: List[Dict], split: str) -> List[
     flattened_examples = []
     
     for entry in raw_data_list:
-        # 1. Base Context
         time_period = entry.get('time', 'Unknown')
         dataset_name = entry.get('dataset', 'Unknown')
         demog_str = format_demographics(entry.get('demog', {}))
         
-        narrative = f"This is a respondent from the {dataset_name} dataset in {time_period}."
+        narrative = f"You are a survey respondent based in California."
+        task_desc = f"Predict how this respondent will respond to the following survery question. Return the letter corresponding to the survey question choice."
         
-        # 2. Get Section Data
         section_data = entry.get(split, {})
         
-        # These maps are parallel
         text_map = section_data.get('var_label2qst_text', {})
         choices_map = section_data.get('var_label2qst_choices', {})
-        # This one contains the answer logic {var: {option_text, option_letter}}
+        # options map contains the answer logic {var: {option_text, option_letter}}
         options_map = section_data.get('var_label2qst_option', {})
         
-        # 3. Create Examples
         for var_label, answer_data in options_map.items():
             
             # answer_data is a dictionary, e.g. {'option_letter': 'A', 'option_text': 'Yes'}
@@ -66,17 +63,17 @@ def flatten_data_to_llama_format(raw_data_list: List[Dict], split: str) -> List[
             choices_block = choices_map.get(var_label, "")
             question_varlabel_desc = VARLABEL_DESC[var_label]
 
-            # construct P=prompt
+            # construct prompt
             prompt = (
                 f"{narrative}\n"
-                f"Demographics: {demog_str}.\n"
-                f"Question ({question_varlabel_desc}): {question_text}\n"
+                f"You have the following demographic profile: {demog_str}.\n"
+                f"Answer the following question about {question_varlabel_desc} according to your demographic profile: {question_text}\n"
                 f"{choices_block}\n"
                 f"Answer:"
             )
             
-            # Construct Completion
-            completion = f" {target_letter}"
+            # construct completiion target (just the target letter)
+            completion = f"{target_letter}"
             
             flattened_examples.append({
                 "prompt": prompt,
