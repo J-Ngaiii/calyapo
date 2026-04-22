@@ -88,16 +88,14 @@ def parse_calyapo_data(file_path):
             
             match = meta_regex.search(prompt)
             if match:
-                # 1. Start with base fields
                 entry = {
                     "dataset_date": match.group("date"),
                     "topic": match.group("topic"),
                     "answer": completion
                 }
                 
-                # 2. Parse Demographics string (e.g., "Age: 50-64, Party: Democrat")
                 demog_str = match.group("demogs")
-                # Split by comma, but only if followed by a "Key: " pattern
+                # split by comma, but only if followed by a "Key: " pattern
                 parts = re.split(r",\s*(?=[A-Za-z\s]+:)", demog_str)
                 
                 for p in parts:
@@ -163,23 +161,21 @@ def main(train_plan: str, calyapo_data: dict, sub_folder: str = None, verbose: b
     """
     Modified to take calyapo_data as an argument and update it in-place.
     """
-    # Get paths for this specific model's inference results
     inf_data_paths = get_inf_data_path(train_plan=train_plan, sub_folder=sub_folder, verbose=verbose)
 
     for k, v in inf_data_paths.items():
         if not v: continue # Skip if results/config are missing
         
         inf_dat = parse_inference_data(**v, verbose=verbose)
-        # Clean model name for column headers (remove slashes/paths)
+        # clean model name for column headers (remove slashes/paths)
         model_id = str(inf_dat['model_name'][0]).split('/')[-1]
         split, model_type = k.split('_')
 
         base_dat = calyapo_data[split]
         
-        # Safety checks
+        # safety checks
         assert len(base_dat) == len(inf_dat), f"Length mismatch for {model_id} on {split} split."
         
-        # Add the specific columns for this model
         base_dat[f'{model_id}_{model_type}_pred'] = inf_dat['model_prediction'].values
         base_dat[f'{model_id}_{model_type}_correct'] = inf_dat['prediction_correct'].values
 
@@ -204,7 +200,6 @@ if __name__ == "__main__":
         'Llama-3.2-3B-Instruct', 
     ]
 
-    # 1. LOAD BASE DATA ONCE
     base_data_paths = get_base_data_path(train_plan=args.train_plan, verbose=args.verbose)
     all_results = {
         'train' : parse_calyapo_data(base_data_paths['train']), 
@@ -212,7 +207,6 @@ if __name__ == "__main__":
         'test' : parse_calyapo_data(base_data_paths['test'])
     }
 
-    # 2. ACCUMULATE COLUMNS FOR ALL MODELS
     for model_name in LLAMA_MODELS_FINETUNED:
         print(f"--- Processing Model: {model_name} ---")
         all_results = main(
@@ -222,7 +216,6 @@ if __name__ == "__main__":
             verbose = args.verbose
         )
 
-    # 3. SAVE ONCE AFTER LOOP
     if args.save:
         OUTPATH_FOLDER.mkdir(parents=True, exist_ok=True)
         for split in ['train', 'val', 'test']:

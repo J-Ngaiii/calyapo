@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Iterable
 
 from calyapo.configurations.data_map_config import TRAIN_PLANS, VARLABEL_DESC
-from calyapo.configurations.config import UNIVERSAL_FINAL_FOLDER, UNIVERSAL_NA_FILLER
+from calyapo.configurations.config import UNIVERSAL_FINAL_FOLDER, UNIVERSAL_NA_FILLER, IGS_SURVEY_WAVE_DESC, POLLING_FIRM_DESC
 from calyapo.data_preprocessing.cleaning_objects import DataPackage, Individual
 from calyapo.utils.persistence import *
 
@@ -27,12 +27,13 @@ def flatten_data_to_llama_format(raw_data_list: List[Dict], split: str) -> List[
     flattened_examples = []
     
     for entry in raw_data_list:
-        time_period = entry.get('time', 'Unknown')
-        dataset_name = entry.get('dataset', 'Unknown')
+        time_label = entry.get('time', 'Unknown')
+        polling_date = IGS_SURVEY_WAVE_DESC.get(time_label, 'Unkown')
+        dataset_label = entry.get('dataset', 'Unknown')
+        polling_firm = POLLING_FIRM_DESC.get(dataset_label, 'Unkown')
         demog_str = format_demographics(entry.get('demog', {}))
         
-        narrative = f"You are a survey respondent based in California."
-        task_desc = f"Predict how this respondent will respond to the following survery question. Return the letter corresponding to the survey question choice."
+        narrative = f"You are a survey respondent based in California from the {polling_date} {polling_firm} polling wave."
         
         section_data = entry.get(split, {})
         
@@ -142,10 +143,11 @@ def subdivide_training_set(
     out_pack = DataPackage(package.dataset_name, package.train_plan, package.time_period)
     np.random.default_rng(seed)
 
-    base_train_set = package['train']  # List of {prompt: completion}
+    base_train_set = package['train']  # list of {prompt: completion}
     train_size_total = len(base_train_set)
+    rng = np.random.default_rng(seed)
     for proportion in subproportions:
-        indices = rng.choice(len(val_valid_indivs), size=int(train_size_total * proportion), replace=False)
+        indices = rng.choice(train_size_total, size=int(train_size_total * proportion), replace=False)
         train_subproportion = [base_train_set[i] for i in indices]
         out_pack[f"train_{str(proportion)}"] = train_subproportion
 

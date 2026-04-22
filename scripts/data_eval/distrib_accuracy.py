@@ -134,7 +134,8 @@ def main():
     
     final_df.to_csv(out_path / "aggregated_kl_metrics.csv", index=False)
 
-    summary = final_df.groupby(['Split', 'Question', 'Model'])[['KL_Divergence']].mean()
+    summary = final_df.groupby(['Split', 'Question', 'Model'])[['KL_Divergence', 'Wasserstein_Distance']].mean()
+    summary.rename(columns={'KL_Divergence' : 'Average_KL', 'Wasserstein_Distance' : 'Average_WD'}, inplace=True)
     summary.to_csv(out_path / "summary_metrics.csv")
 
     print(f"Analysis complete. Results saved to {out_path}")

@@ -31,7 +31,7 @@ def validate_jsonl_by_label(jsonl_path: str):
 
     print(f"--- JSONL Breakdown: {jsonl_path} ---")
     for label, count in sorted(stats.items()):
-        print(f"  {label}: {count}")
+        print(f"  {label}: {count} / {100*count/total_lines}%")
     print(f"  TOTAL: {total_lines}")
     
     return stats
@@ -39,12 +39,12 @@ def validate_jsonl_by_label(jsonl_path: str):
 def primary_checker(train_plan):
     train_path = UNIVERSAL_FINAL_FOLDER / f"{train_plan}_train.jsonl"
     val_path = UNIVERSAL_FINAL_FOLDER / f"{train_plan}_val.jsonl"
+    test_path = UNIVERSAL_FINAL_FOLDER / f"{train_plan}_test.jsonl"
 
     results = {}
 
-    for name, path in [("train", train_path), ("val", val_path)]:
+    for name, path in [("train", train_path), ("val", val_path), ("test", test_path)]:
         if path.exists():
-            # 2. Count lines in the JSONL file
             with open(path, 'r', encoding='utf-8') as f:
                 count = sum(1 for line in f)
             results[name] = count

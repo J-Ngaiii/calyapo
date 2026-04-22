@@ -172,10 +172,10 @@ class SplitHandler:
 
     def subproportion_dataset(self, package: DataPackage = None, save: bool = False, debug: bool = False, verbose: bool = False):
         """
-        Takes it a fully combined dataset of prompts then creates subsamples of just the training dataset. 
+        Takes in a fully combined dataset of prompts then creates subsamples of just the training dataset. 
         Eg. given train_plan_train.jsonl --> creates train_plan_train_0.1.jsonl, train_plan_train_0.25.json, etc
         """
-        if package is None or package['dataset_packages'] is None:
+        if package is None or package['train'] is None:
             if verbose: print(f"(Split Handler | Subproportions) no package passed in memory, calling SplitHandler combine_datasets")
             package = self.combine_datasets(save=save, debug=debug, verbose=verbose)
         else:

@@ -22,9 +22,7 @@ VARLABEL_DESC = {
     'marital' : 'Marital Status', 
     'oppose_immigration_senate' : 'Importance of Senatorial Candidate Immigration Toughness',
     'biden_opinion' : 'Joe Biden Favorability',
-    'harris_opinion' : 'Kamala Harris Favorability'
-
-    
+    'harris_opinion' : 'Kamala Harris Favorability'   
 }
 
 # IGS finetuning variable maps

@@ -199,6 +199,8 @@ def split_ratio_validator(pack: DataPackage, valid_indiv_setting: str = None, ve
     """
     Ensures every unique individual exists in exactly one split with no overlaps.
     Catch both duplicates within a set and leakage across sets.
+
+    TODO: Build out to also validate training setting #2 to make sure individuals in test are also in train
     """
     id_registry = defaultdict(list) # maps individuals : splits they're in
     
