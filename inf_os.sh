@@ -77,17 +77,19 @@ ADAPTER_FOLDER="llama3.1-8b_wd0.1_gam0.85_lr1e-05_2026-04-12-04-58-33PM"
 # MODEL_NAME="meta-llama/Llama-2-7b-hf"
 # MODEL_NICKNAME="llama2-7b" 
 
-MODEL_TYPE="base" 
-# MODEL_TYPE="lora" 
+# MODEL_TYPE="base" 
+MODEL_TYPE="lora" 
 # SPLIT="train"
-# SPLIT="val"
-SPLIT="test"
+SPLIT="val"
+# SPLIT="test"
 
+RUN_KEYWORD="aurora"
 NUM_GPUS=1
 CHUNK_SIZE=2000
 
 python scripts/llm/offline_inf.py --train_plan=${TRAIN_PLAN} \
     --model_name=${MODEL_NAME} \
+    --run_keyword=${RUN_KEYWORD} \
     --adapter_folder=${ADAPTER_FOLDER} \
     --model_type=${MODEL_TYPE} \
     --split=${SPLIT} \

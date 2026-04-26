@@ -16,7 +16,7 @@ class Tabularizer:
         self.verbose = verbose
 
         self.base_report_path = self.root / "inference_outputs" / train_plan / f"reports_{keyword}"
-        self.eval_data_path = self.base_report_path / "evaluation_datasets"
+        self.tabular_folder_path = self.base_report_path / "evaluation_datasets"
         self.results_output_path = self.base_report_path / "results"
         
         self.meta_regex = re.compile(
@@ -29,7 +29,7 @@ class Tabularizer:
         """
         Creates the report folder structure.
         """
-        self.eval_data_path.mkdir(parents=True, exist_ok=True)
+        self.tabular_folder_path.mkdir(parents=True, exist_ok=True)
         self.results_output_path.mkdir(parents=True, exist_ok=True)
 
     def parse_base_calyapo_data(self, data_path: Path, meta_path: Path) -> pd.DataFrame:
@@ -82,7 +82,7 @@ class Tabularizer:
                 
         return pd.DataFrame(rows)
 
-    def get_inference_files(self, model_subfolder: Path) -> Dict:
+    def get_inference_files(self, model_subfolder: Path,) -> Dict:
         """
         Locates results and config file paths for a specific model.
         """
@@ -117,16 +117,30 @@ class Tabularizer:
     def run_pipeline(self, model_map: Dict[str, str]):
         self.setup_directories()
 
+        partitions = ['train', 'val', 'test']
+        report_meta_config = {
+            'calaypo_data_paths' : {}, 
+            'inference_data_paths' : {}
+        }
         combined_dataframes = {}
-        for split in ['train', 'val', 'test']:
+        for split in partitions:
             d_path = UNIVERSAL_FINAL_FOLDER / f"{self.train_plan}_{split}.jsonl"
             m_path = UNIVERSAL_FINAL_FOLDER / f"{self.train_plan}_{split}_meta.jsonl"
             combined_dataframes[split] = self.parse_base_calyapo_data(d_path, m_path)
+            
+            report_meta_calyapo_paths_subdict: Dict = report_meta_config['calaypo_data_paths']
+            report_meta_calyapo_paths_subdict[split] = {
+                'data_path' : str(d_path), # cannot serialize path objects into json 
+                'meta_path' : str(m_path)
+            }
 
 
         for model_nickname, sub_path in model_map.items():
             inf_files = self.get_inference_files(Path(sub_path))
             
+            report_meta_inf_paths_subdict: Dict = report_meta_config['inference_data_paths']
+            report_meta_inf_paths_subdict[model_nickname] = str(sub_path)
+
             for key, inf_paths in inf_files.items():
                 if 'results_path' not in inf_paths: 
                     continue
@@ -149,16 +163,17 @@ class Tabularizer:
 
         for split, df in combined_dataframes.items():
             if not df.empty:
-                out_file = self.eval_data_path / f"{self.train_plan}_{split}_tabular.csv"
+                out_file = self.tabular_folder_path / f"{self.train_plan}_{split}_tabular.csv"
                 df.to_csv(out_file, index=False)
                 if self.verbose: 
                     print(f"Created Tabular Data: {out_file}")
 
-        report_config = {
+        report_meta_config.update({
             "train_plan": self.train_plan,
-            "keyword": self.keyword,
+            "run_keyword": self.keyword,
             "models_included": list(model_map.keys()),
-            "base_data_source": str(UNIVERSAL_FINAL_FOLDER)
-        }
-        with open(self.base_report_path / "report_config.json", "w") as f:
-            json.dump(report_config, f, indent=4)
+        })
+        if self.verbose: 
+            print(f"Final Meta Report:\n{report_meta_config}")
+        with open(self.base_report_path / "report_meta_config.json", "w") as f:
+            json.dump(report_meta_config, f, indent=4)

@@ -143,7 +143,7 @@ if __name__ == "__main__":
     TRAIN_PATH = Path(f"calyapo/data/final/{TRAIN_PLAN}_train.jsonl")
     VAL_PATH = Path(f"calyapo/data/final/{TRAIN_PLAN}_val.jsonl")
     TEST_PATH = Path(f"calyapo/data/final/{TRAIN_PLAN}_test.jsonl")
-    OUTPUT_FOLDER = Path(f"inference_outputs/{TRAIN_PLAN}/{args.run_keyword}")
+    OUTPUT_FOLDER = Path(f"inference_outputs/{TRAIN_PLAN}/outputs_{args.run_keyword}")
     LORA_ADAPTER_PATH = Path(f"calyapo/training/checkpoints/{TRAIN_PLAN}_dataset/{args.adapter_folder}")
     
     USE_LORA = args.model_type.lower() == 'lora'

@@ -14,14 +14,18 @@ def main():
     args = parser.parse_args()
 
     LLAMA_SUBFOLDER = "meta-llama"
+    QWEN_SUBFOLDER = "qwen"
     LLAMA_MODELS_FINETUNED = [
         'Llama-3.1-8B', 
         'Llama-3.1-8B-Instruct', 
         'Llama-3.2-3B', 
         'Llama-3.2-3B-Instruct', 
     ]
+    QWEN_MODELS_FINETUNED = [
+        'not implemented' 
+    ]
 
-    model_map = {model: Path(args.run_keyword) / Path(LLAMA_SUBFOLDER) / model for model in LLAMA_MODELS_FINETUNED / args.run_keyword}
+    model_map = {model: Path(f"outputs_{args.run_keyword}") / Path(LLAMA_SUBFOLDER) / model for model in LLAMA_MODELS_FINETUNED }
 
     tab = Tabularizer(
         train_plan=args.train_plan,

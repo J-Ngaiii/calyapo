@@ -1,5 +1,5 @@
 
-from typing import List, Dict, Any, Union
+from typing import List, Dict, Any, Union, Iterable
 import string
 import json
 from pathlib import Path
@@ -122,7 +122,21 @@ class DataPackage:
 
     def get_data(self, keyword: str):
         return self.get(keyword)
-    
+
+def _unique_id_helper(idx: str, time_period: str, id_type: str = 'polling_wave'):
+    if id_type == 'polling_wave':
+        return f"{idx}-{time_period}"
+    else:
+        raise ValueError(f"(unique_id_generator) Unknown ID type: '{id_type}'.")
+
+def unique_id_generator(base_ids: Union[str, Iterable[str]], time_period: str, id_type: str = 'polling_wave'):
+    if isinstance(base_ids, (list, pd.Series, np.ndarray)):
+        return [_unique_id_helper(idx=idx, time_period=time_period, id_type=id_type) for idx in base_ids]
+    elif isinstance(base_ids, (str, int)):
+        return _unique_id_helper(idx=str(base_ids), time_period=time_period, id_type=id_type)
+    else:
+        raise ValueError(f"(unique_id_generator) Inputted ids are type '{type(base_ids)}', expected str or Iterable.")
+
 class Individual:
     def __init__(self, idx, time_period, train_plan, dataset_name, na_filler = UNIVERSAL_NA_FILLER):
         if train_plan not in TRAIN_PLANS:
@@ -137,7 +151,7 @@ class Individual:
             raise ValueError(f"Unknown dataset {dataset_name} in ALL_DATA_MAPS")
         
         self.id = idx
-        self.uniqueid = f"{idx}-{time_period}"
+        self.uniqueid = unique_id_generator(base_ids=self.id)
         self.time_period = time_period
         self.dataset_name = dataset_name
         self.train_plan = train_plan # tracked for metadata only

@@ -50,7 +50,7 @@ def run_analysis(df: pd.DataFrame, analysis_config: Dict, verbose: bool = False,
             for model_id in analysis_config['models_list']:
                 m_cols = [f"{model_id}_{l}" for l in option_choices]
 
-                if debug: 
+                if debug: Q
                     print(f"(run_analysis | debug) mcol: {m_cols}, demog_col: {demog_col}")
 
                 q_values = []
