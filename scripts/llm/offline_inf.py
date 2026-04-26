@@ -128,6 +128,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fully runs offline inference pipeline.") 
     parser.add_argument("--train_plan", type=str, nargs='?', default='opinion_school', help="Name of training plan to finetune on.")
     parser.add_argument("--model_name", type=str, nargs='?',  help="Name of model to finetune on.")
+    parser.add_argument("--run_keyword", type=str, nargs='?', default='aurora', help="Name of inference run")
     parser.add_argument("--adapter_folder", type=str, nargs='?', default=None, help="Folder with safetensor and json.")
     parser.add_argument("--model_type", type=str, choices=['lora', 'base'], default='train')
     parser.add_argument("--split", type=str, choices=['train', 'val', 'test'], default='train')
@@ -142,7 +143,7 @@ if __name__ == "__main__":
     TRAIN_PATH = Path(f"calyapo/data/final/{TRAIN_PLAN}_train.jsonl")
     VAL_PATH = Path(f"calyapo/data/final/{TRAIN_PLAN}_val.jsonl")
     TEST_PATH = Path(f"calyapo/data/final/{TRAIN_PLAN}_test.jsonl")
-    OUTPUT_FOLDER = Path(f"inference_outputs/{TRAIN_PLAN}")
+    OUTPUT_FOLDER = Path(f"inference_outputs/{TRAIN_PLAN}/{args.run_keyword}")
     LORA_ADAPTER_PATH = Path(f"calyapo/training/checkpoints/{TRAIN_PLAN}_dataset/{args.adapter_folder}")
     
     USE_LORA = args.model_type.lower() == 'lora'

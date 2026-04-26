@@ -8,7 +8,7 @@ def main():
     parser = argparse.ArgumentParser(description="Runs analysis of offline inference data.") 
     parser.get_default("--train_plan",) # Maintaining your preferred default style
     parser.add_argument("--train_plan", type=str, nargs='?', default='opinion_school', help="Name of training plan.")
-    parser.add_argument("--keyword", type=str, nargs='?', default='default_report', help="Keyword for the report folder.")
+    parser.add_argument("--run_keyword", type=str, nargs='?', default='aurora', help="Keyword for the report folder.")
     parser.add_argument("--verbose", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--debug", action=argparse.BooleanOptionalAction, default=True)
     args = parser.parse_args()
@@ -21,11 +21,11 @@ def main():
         'Llama-3.2-3B-Instruct', 
     ]
 
-    model_map = {model: Path(LLAMA_SUBFOLDER) / model for model in LLAMA_MODELS_FINETUNED}
+    model_map = {model: Path(args.run_keyword) / Path(LLAMA_SUBFOLDER) / model for model in LLAMA_MODELS_FINETUNED / args.run_keyword}
 
     tab = Tabularizer(
         train_plan=args.train_plan,
-        keyword=args.keyword,
+        keyword=args.run_keyword,
         root_path=".",
         debug=args.debug,
         verbose=args.verbose
@@ -34,7 +34,7 @@ def main():
     if args.verbose:
         print(f"--- Starting Tabularize Pipeline ---")
         print(f"Train Plan: {args.train_plan}")
-        print(f"Keyword:    {args.keyword}")
+        print(f"Keyword:    {args.run_keyword}")
 
     tab.run_pipeline(model_map=model_map)
 
