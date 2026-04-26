@@ -20,31 +20,34 @@ def calculate_metrics(p, q):
     
     return kl, wd
 
-def run_analysis(df: pd.DataFrame, df_config: Dict, demographics: Iterable, models_info: Iterable, verbose: bool = False, debug: bool = False):
+def run_analysis(df: pd.DataFrame, analysis_config: Dict, verbose: bool = False, debug: bool = False):
+    """
+    Calculates kl and wd between model distribution and real distribution over choices in response to a survey question for a specific demographic subgroup.
+    """
     results = []
     
-    # Logic for crosstabs: comparing distribution vectors
+    # logic for crosstabs: comparing distribution vectors
     true_cols = [c for c in df.columns if c.startswith('true_')]
     option_choices = [c.replace('true_', '') for c in true_cols]
-    demog_col_labels = df.columns[df_config['demog_col_idx']]
+    demog_col_labels = df.columns[analysis_config['demog_col_idx']]
 
     if debug:
         print(f"(run_analysis | debug) demog_col_labels: {demog_col_labels}")
     for demog_col in demog_col_labels:
         for _, row in df.iterrows():
-            subgroup = row[demog_col]
+            subgroup = row[demog_col] # certain group (eg. 18-29 bucket for age)
 
             if debug: 
                 print(f"(run_analysis | debug) subgroup: {demog_col_labels}")
 
             if pd.isna(subgroup): continue 
-            
+        
             p_dist = row[true_cols].values.astype(float)
 
             if debug: 
                 print(f"(run_analysis | debug) p_dist: {p_dist}")
 
-            for model_id in models_info:
+            for model_id in analysis_config['models_list']:
                 m_cols = [f"{model_id}_{l}" for l in option_choices]
 
                 if debug: 
@@ -104,12 +107,12 @@ def main():
         potential_models = [c for c in df.columns if c not in true_cols and c not in demog_cols]
         models = sorted(list(set([m.rsplit('_', 1)[0] for m in potential_models if '_' in m])))
 
-        df_config = {'demog_col_idx': args.demog_col_idx}
+        analysis_config = {'demog_col_idx': args.demog_col_idx, 'models_list': models}
         
         if args.debug:
             print(f"(main | debug) Inputted df: {df}")
 
-        file_results = run_analysis(df, df_config, demog_cols, models, verbose=args.verbose, debug=args.debug)
+        file_results = run_analysis(df, analysis_config, verbose=args.verbose, debug=args.debug)
 
         if args.debug:
             print(f"(main | debug) Results of run_analysis: {file_results}")

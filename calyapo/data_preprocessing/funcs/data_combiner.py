@@ -25,8 +25,10 @@ def flatten_data_to_llama_format(raw_data_list: List[Dict], split: str) -> List[
     Flattens Individuals into MCQ Prompt/Completion pairs.
     """
     flattened_examples = []
+    meta_configs = []
     
     for entry in raw_data_list:
+        # track IDS here
         time_label = entry.get('time', 'Unknown')
         polling_date = IGS_SURVEY_WAVE_DESC.get(time_label, 'Unkown')
         dataset_label = entry.get('dataset', 'Unknown')
@@ -42,6 +44,7 @@ def flatten_data_to_llama_format(raw_data_list: List[Dict], split: str) -> List[
         # options map contains the answer logic {var: {option_text, option_letter}}
         options_map = section_data.get('var_label2qst_option', {})
         
+        # each datapoint is a unique individual-question pair so now we iterate thru questions
         for var_label, answer_data in options_map.items():
             
             # answer_data is a dictionary, e.g. {'option_letter': 'A', 'option_text': 'Yes'}
@@ -81,7 +84,13 @@ def flatten_data_to_llama_format(raw_data_list: List[Dict], split: str) -> List[
                 "completion": completion
             })
             
-    return flattened_examples
+            meta_configs.append({
+                'id': entry.get('id', 'Unknown'), 
+                'uniqueid': entry.get('uniqueid', 'Unknown'), 
+                'time_period': entry.get('time', 'Unknown'), 
+                'dataset': entry.get('dataset', 'Unknown'), 
+            })
+    return flattened_examples, meta_configs
 
 def save_jsonl(data: List[Dict], filename: str, out_path: str = None, verbose: bool = False):
     if out_path is None:
@@ -94,16 +103,27 @@ def save_jsonl(data: List[Dict], filename: str, out_path: str = None, verbose: b
             f.write(json.dumps(entry) + "\n")
 
 def split_combine(
-        package: DataPackage, 
-        out_path: str = None, 
-        save: bool = True, 
-        debug: bool = False, 
+        package: DataPackage,
+        out_path: str = None,
+        save: bool = True,
+        debug: bool = False,
         verbose: bool = True
     ):
-    train_data = [] # list of {prompt : completion} dictionaries
-    val_data = []
-    test_data = []
-        
+    data_dict = {
+        'train' : {
+            'data' : [], # when function finishes this will be list of {prompt : completion} dictionaries
+            'meta' : []
+        },
+        'val' : {
+            'data' : [],
+            'meta' : []
+        },
+        'test' : {
+            'data' : [],
+            'meta' : []
+        }
+    }
+       
     # needs to be able to take different packages in memory
     if verbose:
         print(f"(split_combine) There are '{len(package['dataset_packages'])}' datasets to process")
@@ -112,23 +132,24 @@ def split_combine(
         if debug:
             print(f"(split_combine | Debug) Data Package: {package}")
 
-        train_indiv_maps: List[Dict] = inpack.get('train')
-        val_indiv_maps: List[Dict] = inpack.get('val')
-        test_indiv_maps: List[Dict] = inpack.get('test')
-        train_data.extend(flatten_data_to_llama_format(train_indiv_maps, 'train'))
-        val_data.extend(flatten_data_to_llama_format(val_indiv_maps, 'val'))
-        test_data.extend(flatten_data_to_llama_format(test_indiv_maps, 'test'))
+        for split, split_dict in data_dict.items():
+            indiv_map: List[Dict] = inpack.get(split)
+            data, meta = flatten_data_to_llama_format(indiv_map, split)
+            split_dict['data'].extend(data)
+            split_dict['meta'].extend(meta)
 
     if save:
         assert out_path is not None, f"(split_combine | WARNING) Cannot have no out_path if saving."
-        save_jsonl(train_data, f"{package.train_plan}_train.jsonl", out_path, verbose)
-        save_jsonl(val_data, f"{package.train_plan}_val.jsonl", out_path, verbose)
-        save_jsonl(test_data, f"{package.train_plan}_test.jsonl", out_path, verbose)
+        for split, split_dict in data_dict.items():
+            save_jsonl(split_dict['data'], f"{package.train_plan}_{split}.jsonl", out_path, verbose)
+            save_jsonl(split_dict['meta'], f"{package.train_plan}_{split}_meta.jsonl", out_path, verbose)
+
 
     out_pack = DataPackage(package.dataset_name, package.train_plan, package.time_period)
-    out_pack['train'] = train_data
-    out_pack['val'] = val_data
-    out_pack['test'] = test_data
+    for split, split_dict in data_dict.items():
+        out_pack[split] = split_dict['data']
+        out_pack[f"{split}_meta"] = split_dict['meta']
+
     return out_pack
 
 def subdivide_training_set(
@@ -144,16 +165,23 @@ def subdivide_training_set(
     np.random.default_rng(seed)
 
     base_train_set = package['train']  # list of {prompt: completion}
+    base_train_meta = package['train_meta']
     train_size_total = len(base_train_set)
     rng = np.random.default_rng(seed)
     for proportion in subproportions:
         indices = rng.choice(train_size_total, size=int(train_size_total * proportion), replace=False)
-        train_subproportion = [base_train_set[i] for i in indices]
+        train_subproportion = []
+        train_subproportion_meta = []
+        for i in indices:
+            train_subproportion.append(base_train_set[i])
+            train_subproportion_meta.append(base_train_meta[i])
         out_pack[f"train_{str(proportion)}"] = train_subproportion
+        out_pack[f"train_{str(proportion)}_meta"] = train_subproportion_meta
 
         if save:
             assert out_path is not None, f"(subdivide_training_set | WARNING) Cannot have no out_path if saving."
             save_jsonl(train_subproportion, f"{package.train_plan}_train_{str(proportion)}.jsonl", out_path, verbose)
+            save_jsonl(train_subproportion_meta, f"{package.train_plan}_train_{str(proportion)}_meta.jsonl", out_path, verbose)
 
     return out_pack
 

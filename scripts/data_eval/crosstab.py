@@ -73,6 +73,13 @@ def run_crosstab_analysis(train_plan: str, data_folder: str, output_folder: str,
             for demog in demog_cols:
                 # calculate the true proportions first
                 base_ct = pd.crosstab(topic_df[demog], topic_df['answer'], normalize='index')
+                # weighted_base_ct = pd.pivot_table(
+                #     topic_df, 
+                #     values='w1', 
+                #     index='demog', 
+                #     columns='answer', 
+                #     aggfunc='sum'
+                # ) # need to build weights into evaluation table => build weights into original dataset
                 base_ct = (base_ct * 100).round(2)
                 base_ct.columns = [f"true_{c}" for c in base_ct.columns] # mark the crosstab col values corresponding to true proportions accordingly
                 
@@ -84,6 +91,13 @@ def run_crosstab_analysis(train_plan: str, data_folder: str, output_folder: str,
                     
                     # calculate model crosstab proportions
                     m_ct = pd.crosstab(topic_df[demog], topic_df[mcol], normalize='index')
+                    # weighted_model_ct = pd.pivot_table(
+                    #     topic_df, 
+                    #     values='w1', 
+                    #     index='demog', 
+                    #     columns='answer', 
+                    #     aggfunc='sum'
+                    # ) # need to build weights into evaluation table => build weights into original dataset
                     m_ct = (m_ct * 100).round(2)
                     m_ct.columns = [f"{model_name}_{c}" for c in m_ct.columns] # mark accordingly
                     

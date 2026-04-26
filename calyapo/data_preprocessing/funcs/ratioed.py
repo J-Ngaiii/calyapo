@@ -77,6 +77,18 @@ def split_ratio(
 
     Output must put it each unique value into a particular split (train/val/test) with no overlaps in Train Settings 1 and 2
     """
+    def construct_meta(package: DataPackage, split: str, debug: bool = False, verbose: bool = False):
+        meta = []
+        for indiv_map in package[split]:
+            indiv_conf = {
+                'id': indiv_map['id'], 
+                'uniqueid': indiv_map['uniqueid'], 
+                'time': indiv_map['time'], 
+                'dataset': indiv_map['dataset']
+            }
+            meta.append(indiv_conf)
+        return meta
+            
     if debug:
             test = (
                 len(package['train']) == len(package['val'])
@@ -189,6 +201,7 @@ def split_ratio(
         print(f"(split_ratio | Debug) FINAL num datapoints per split:\nTrain: '{len(outPack['train'])}'\nVal: '{len(outPack['val'])}'\nTest: '{len(outPack['test'])}'")
     if save:
         assert out_path is not None, f"(split_ratio) Cannot save if out_path not specified"
+        
         file_name = f"{package.train_plan}_{package.dataset_name}_fullsplit.json"
         full_path = Path(out_path) / file_name
         file_saver(out_path=full_path, data=outPack, data_type='DataPackage', indnt=2, verbose=verbose)

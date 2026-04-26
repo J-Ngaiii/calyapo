@@ -114,13 +114,25 @@ def file_saver(out_path: Path, data: Any, data_type: str, indnt: int = 4, verbos
         out_path = Path(out_path)
         
     out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if data_type is None:
+        # automatically specify type if missing
+        if isinstance(data, pd.DataFrame):
+            data_type = "csv"
+        elif isinstance(data, (list, dict)):
+            data_type = "json"
             
-    if isinstance(data, pd.DataFrame) or data_type == "csv":
+    if data_type == "csv":
         data.to_csv(out_path, index=False)
-    elif isinstance(data, (list, dict)) or data_type == "json":
+    elif data_type == "json":
         with open(out_path, 'w') as f:
             json.dump(data, f, indent=indnt)
-    elif isinstance(data, pd.DataFrame) or data_type == "DataPackage":
+    elif data_type == "jsonl":
+        with open(out_path, 'w', encoding='utf-8') as f:
+            for entry in data:
+                json_record = json.dumps(entry, ensure_ascii=False)
+                f.write(json_record + '\n')
+    elif data_type == "DataPackage" and hasattr(data, 'to_dict'):
         with open(out_path, 'w') as f:
             json.dump(data.to_dict(debug=True), f, indent=indnt)
     elif hasattr(data, 'to_dict'):

@@ -83,9 +83,9 @@ IGS_RACE_MAP = {
 
 IGS_SURVEY_WAVE_DESC = {
     '202402' : "Febuary 2024", 
-    '20240819' : "August 19, 2024", 
-    '20240925' : "September 25, 2024", 
-    '20241028' : "October 28, 2024", 
+    '20240819' : "August, 2024", 
+    '20240925' : "September, 2024", 
+    '20241028' : "October, 2024", 
 }
 
 POLLING_FIRM_DESC = {

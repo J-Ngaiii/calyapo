@@ -44,7 +44,7 @@ def process_csv(data: pd.DataFrame, dataset_name: str, train_plan: str, reductio
         
         entry = Individual(indiv_id, time_period, train_plan, dataset_name)
 
-        # 1. demographics
+        # demographics
         for var_label in tp_wrap.get_var_lst('demo'):
             csv_col = label2var.get(var_label)
             if csv_col and csv_col in row:
@@ -52,20 +52,20 @@ def process_csv(data: pd.DataFrame, dataset_name: str, train_plan: str, reductio
             else:
                 entry.add_demog(var_label, UNIVERSAL_NA_FILLER, debug)
 
-        # 2. train questions
+        # train questions
         for var_label in tp_wrap.get_var_lst('train_resp'):
             csv_col = label2var.get(var_label)
             if csv_col and csv_col in row:
                 entry.add_train(var_label, row[csv_col])
                 
 
-        # 3. val questions
+        # val questions
         for var_label in tp_wrap.get_var_lst('val_resp'):
             csv_col = label2var.get(var_label)
             if csv_col and csv_col in row:
                 entry.add_val(var_label, row[csv_col])
         
-        # 4. test questions
+        # test questions
         for var_label in tp_wrap.get_var_lst('test_resp'):
             csv_col = label2var.get(var_label)
             if csv_col and csv_col in row:
