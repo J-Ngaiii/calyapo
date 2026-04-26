@@ -38,9 +38,8 @@ class Tabularizer:
         Data should be in '<prompt> : <completion>' format.
         Function extracts demographics and topics.
 
-        Assumes order of data and meta are the same (which it is under current implementation of split_combine)
-
-        TODO: integration with creation of meta files in Calyapo pipe
+        Assumes order of data and meta are the same (which it is under current implementation of split_combine).
+        Integrates information from meta files outputted by calyapo pipeline. 
         """
         rows = []
         if not data_path.exists():

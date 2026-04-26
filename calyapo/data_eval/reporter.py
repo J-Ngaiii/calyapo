@@ -32,6 +32,49 @@ class Reporter:
         self.debug = debug
         self.verbose = verbose
 
+    def _pull_weights(self) -> pd.Series:
+        """
+        Gathers weights from all intermediate IGS datasets and 
+        returns a Series indexed by calyapo_uniqueid.
+        """
+        if self.verbose: 
+            print(f"Searching for intermediate IGS weights in calyapo/data/intermediate/igs...")
+
+        igs_path = self.root / "calyapo" / "data" / "intermediate" / "igs"
+        
+        if not igs_path.exists():
+            if self.verbose: print(f"Warning: Path {igs_path} does not exist.")
+            return pd.Series(dtype=float)
+
+        all_weight_dfs = []
+        weight_files = list(igs_path.glob("*.csv"))
+        for file_path in weight_files:
+            try:
+                df = pd.read_csv(
+                    file_path, 
+                    usecols=['calyapo_uniqueid', 'w1'],
+                    dtype={'calyapo_uniqueid': str, 'w1': float}
+                )
+                all_weight_dfs.append(df)
+            except ValueError as e:
+                if self.verbose: 
+                    print(f"Skipping {file_path.name}: Required columns not found. ({e})")
+                continue
+
+        if not all_weight_dfs:
+            if self.verbose: 
+                print("No valid weight data found in intermediate folder.")
+            return pd.Series(dtype=float)
+
+        full_weight_df = pd.concat(all_weight_dfs, ignore_index=True)
+        
+        # remove duplicates (if a respondent appears in multiple waves, 
+        # keep the last one or handle as needed)
+        full_weight_df = full_weight_df.drop_duplicates(subset=['calyapo_uniqueid'])
+        
+        # set index for easy mapping later
+        return full_weight_df.set_index('calyapo_uniqueid')['weight']
+
     def load_tabulars(self, splits: List[str] = None, file_end_tag: str = 'tabular') -> Dict[str, pd.DataFrame]:
         """
         Loads tabularized CSVs into a dictionary keyed by split.
@@ -39,6 +82,8 @@ class Reporter:
         if splits is None: 
             splits = ['train', 'val', 'test']
             
+        weight_lookup = self._pull_weights()
+
         output = {}
         for spl in splits:
             file_name = f"{self.train_plan}_{spl}_{file_end_tag}.csv"
@@ -46,7 +91,14 @@ class Reporter:
             if not file_path.exists():
                 if self.verbose: print(f"Warning: {spl} split not found at {file_path}")
                 continue
-            output[spl] = pd.read_csv(file_path)
+            
+            df = pd.read_csv(file_path)
+            if not weight_lookup.empty:
+                df['weight'] = df['uniqueid'].astype(str).map(weight_lookup).fillna(1.0)
+            else:
+                df['weight'] = 1.0
+
+            output[spl] = df
         return output
 
     # ----------------------------
@@ -179,9 +231,6 @@ class Reporter:
         p = (p + eps) / (p + eps).sum()
         q = (q + eps) / (q + eps).sum()
         return entropy(p, q), wasserstein_distance(p, q)
-
-    def _pull_weights(self):
-        """Use unique id generator to then match """
 
     def distributional_accuracy(self, demog_col_indices: List[int] = [0]):
         """
