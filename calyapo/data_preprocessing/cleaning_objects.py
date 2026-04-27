@@ -151,7 +151,7 @@ class Individual:
             raise ValueError(f"Unknown dataset {dataset_name} in ALL_DATA_MAPS")
         
         self.id = idx
-        self.uniqueid = unique_id_generator(base_ids=self.id)
+        self.uniqueid = unique_id_generator(base_ids=self.id, time_period=time_period)
         self.time_period = time_period
         self.dataset_name = dataset_name
         self.train_plan = train_plan # tracked for metadata only

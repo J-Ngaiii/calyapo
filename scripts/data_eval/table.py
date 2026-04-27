@@ -6,7 +6,6 @@ from calyapo.data_eval.tabularizer import Tabularizer
 
 def main():
     parser = argparse.ArgumentParser(description="Runs analysis of offline inference data.") 
-    parser.get_default("--train_plan",) # Maintaining your preferred default style
     parser.add_argument("--train_plan", type=str, nargs='?', default='opinion_school', help="Name of training plan.")
     parser.add_argument("--run_keyword", type=str, nargs='?', default='aurora', help="Keyword for the report folder.")
     parser.add_argument("--verbose", action=argparse.BooleanOptionalAction, default=True)

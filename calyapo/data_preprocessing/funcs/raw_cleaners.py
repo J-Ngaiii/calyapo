@@ -47,7 +47,7 @@ def _process_single_df(df: pd.DataFrame, period: str, mode: str = 'IGS', debug: 
             if debug:
                 print(f"(process_single | Debug) final df race col and time col:\n{df[['racial_id', 'time_period']]}")
 
-        id_col = [key for key, value in IGS_MAPS[period][var2label].items() if value == 'dataset_id'][0]
+        id_col = [key for key, value in IGS_MAPS[period]['var2label'].items() if value == 'dataset_id'][0]
         df['calyapo_uniqueid'] = unique_id_generator(base_ids=df[id_col], time_period=period)
     elif mode == 'CES':
         pass

@@ -14,7 +14,7 @@ py7zr
 scipy==1.13.0
 optimum
 matplotlib==3.8.4
-seaborn
+seaborn==0.13.2
 chardet
 openai==1.59.8
 typing-extensions>=4.8.0
