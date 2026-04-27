@@ -6,7 +6,7 @@ from calyapo.configurations.data_map_config import TRAIN_PLANS
 
 def main():
     parser = argparse.ArgumentParser(description="Fully runs preprocessing pipeline using the Orchestrator.") 
-    parser.add_argument("--train_plan", type=str, nargs='?', default='presidents_to_abortion', help="Name of training plan to finetune on.")
+    parser.add_argument("--train_plan", type=str, nargs='?', default='test_plan', help="Name of training plan to finetune on.")
     parser.add_argument("--subproportions", type=float, nargs='+', default=[0.1, 0.2, 0.5, 0.7, 1.0], help="Subsamples of the complete training set size to actually train on.")
     parser.add_argument("--train_ratio", type=float, nargs='?', default=0.7, help="Proportion of data on training.")
     parser.add_argument("--val_ratio", type=float, nargs='?', default=0.2, help="Proportion of data on validation.")

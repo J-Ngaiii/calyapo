@@ -20,7 +20,7 @@ from calyapo.training.data.sampler import LengthBasedBatchSampler, DistributedLe
 from calyapo.training.datasets import DATASET_PREPROC
 
 def update_config(config, **kwargs):
-    if isinstance(config, (tuple, list)):
+    if isinstance(config, (tuple, list)): # vectorizes function
         for c in config:
             update_config(c, **kwargs)
     else:
@@ -58,6 +58,44 @@ def generate_peft_config(train_config, kwargs):
 
     update_config(config, **kwargs)
     params = asdict(config)
+
+    # --- GEMMA 4 PATCH ---
+    # If using Gemma 4, we must explicitly exclude the multimodal modules 
+    # and provide a regex that only targets the language model layers.
+    if "gemma-4" in getattr(train_config, "model_name", "").lower():
+        from peft.tuners.lora.model import LoraModel
+        
+        if not hasattr(LoraModel, "_is_gemma4_patched"):
+            # Grab the original function regardless of its signature
+            original_func = LoraModel._create_new_module
+            
+            def patched_create_new_module(*args, **kwargs):
+                # In PEFT, 'target' is usually the 4th positional arg (index 3) 
+                # or passed as a keyword argument.
+                
+                # 1. Handle positional arguments
+                args_list = list(args)
+                if len(args_list) > 3:
+                    target = args_list[3]
+                    if target.__class__.__name__ == "Gemma4ClippableLinear":
+                        args_list[3] = target.linear
+                
+                # 2. Handle keyword arguments
+                if "target" in kwargs:
+                    target = kwargs["target"]
+                    if target.__class__.__name__ == "Gemma4ClippableLinear":
+                        kwargs["target"] = target.linear
+                
+                return original_func(*args_list, **kwargs)
+            
+            # Apply the patch
+            LoraModel._create_new_module = patched_create_new_module
+            LoraModel._is_gemma4_patched = True
+            
+        # Target the standard projections
+        params["target_modules"] = ["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+    # ---------------------
+
     peft_config = peft_configs[names.index(train_config.peft_method)](**params)
 
     return peft_config

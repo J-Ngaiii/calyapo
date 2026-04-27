@@ -31,7 +31,7 @@ class train_config:
     use_fp16: bool=False  # load model paramater in torch.float16 dtype (not recommended)
     mixed_precision: bool=True
     val_batch_size: int=8 # set to one for debugging
-    dataset = "presidents_to_abortion_dataset"
+    dataset = "test_plan_dataset"
     peft_method: str = "lora" # None, llama_adapter (Caution: llama_adapter is currently not supported with FSDP)
     use_peft: bool=False # use parameter efficient fine tuning
     from_peft_checkpoint: str="" # if not empty and use_peft=True, will load the peft checkpoint and resume the fine-tuning on that checkpoint
@@ -55,6 +55,6 @@ class train_config:
 
     # custom fields
     checkpoint_type: str = "StateDictType.FULL_STATE_DICT"
-    model_nickname: str = "llama2-7b"
+    model_nickname: str = "Unkown"
     low_cpu_mem_usage: bool = True
 

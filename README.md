@@ -21,6 +21,17 @@ CalyAPO is Jonathan Ngai's Data Science Honors Thesis repository for analyzing C
 - penultimate (json): compile all jsons from /processed directory based on dataset across time period
 - final (json): contains the actual steering : completion formatted jsons
 
+# Stages of eval
+- make sure intermediate and final copies of calyapo data are available
+- run table.py --> creates tabulars from which visualization functions draw
+- run report.py --> generate crosstabs, accuracy numbers, kl divergence, wd distance and more
+
+# Adding new models for finetuning
+- finetuning.py:
+    - import decode layer
+    - add in handling to load model (line 257)
+    - add in handling for FSDP wrapper (line 341)
+
 # Adding new datasets
 - add to training/configs/datasets.py
 - add to training/datasets/__init__.py

@@ -63,6 +63,7 @@ from transformers import (
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
 from transformers.models.mistral.modeling_mistral import MistralDecoderLayer # mistral support (custom)
 from transformers.models.qwen2.modeling_qwen2 import Qwen2DecoderLayer # for qwen support (custom)
+from transformers.models.gemma4.modeling_gemma4 import Gemma4TextDecoderLayer # for gemma support (custom)
 from transformers.models.mllama.modeling_mllama import (
     MllamaCrossAttentionDecoderLayer,
     MllamaSelfAttentionDecoderLayer,
@@ -228,9 +229,81 @@ def main(**kwargs):
             )
         # ------ ADDED ------ 
         print(f"--> Using language model of type '{config.model_type}' ") # shifted down
+    elif config.model_type == "gemma4": # gemma4 support (custom)
+        is_vision = False
+        # handle Low CPU FSDP loading 
+        if train_config.enable_fsdp and train_config.low_cpu_fsdp:
+            if rank == 0:
+                print(f"--> Rank 0: Loading Gemma4 model {train_config.model_name}...")
+                model = AutoModelForCausalLM.from_pretrained(
+                    train_config.model_name,
+                    quantization_config=bnb_config,
+                    attn_implementation="sdpa" if train_config.use_fast_kernels else None,
+                    torch_dtype=target_dtype,
+                    low_cpu_mem_usage=train_config.low_cpu_mem_usage
+                )
+            else:
+                gemma_config = AutoConfig.from_pretrained(train_config.model_name)
+                gemma_config.use_cache = use_cache
+                with torch.device("meta"):
+                    model = AutoModelForCausalLM.from_config(gemma_config)
+        else:
+            model = AutoModelForCausalLM.from_pretrained(
+                train_config.model_name,
+                quantization_config=bnb_config,
+                torch_dtype=target_dtype,
+            )
+    elif config.model_type == "qwen2": # qwen2 support (custom)
+        is_vision = False
+        if train_config.enable_fsdp and train_config.low_cpu_fsdp:
+            if rank == 0:
+                print(f"--> Rank 0: Loading Qwen2.5 model {train_config.model_name}...")
+                model = AutoModelForCausalLM.from_pretrained(
+                    train_config.model_name,
+                    quantization_config=bnb_config,
+                    attn_implementation="sdpa" if train_config.use_fast_kernels else None,
+                    torch_dtype=target_dtype,
+                    low_cpu_mem_usage=train_config.low_cpu_mem_usage
+                )
+            else:
+                qwen_config = AutoConfig.from_pretrained(train_config.model_name)
+                qwen_config.use_cache = use_cache
+                with torch.device("meta"):
+                    model = AutoModelForCausalLM.from_config(qwen_config)
+        else:
+            model = AutoModelForCausalLM.from_pretrained(
+                train_config.model_name,
+                quantization_config=bnb_config,
+                torch_dtype=target_dtype,
+            )
+    elif config.model_type == "mistral": # mistral support (custom)
+        is_vision = False
+        if train_config.enable_fsdp and train_config.low_cpu_fsdp:
+            if rank == 0:
+                print(f"--> Rank 0: Loading Mistral model {train_config.model_name}...")
+                model = MistralForCausalLM.from_pretrained(
+                    train_config.model_name,
+                    quantization_config=bnb_config, 
+                    attn_implementation="sdpa" if train_config.use_fast_kernels else None,
+                    device_map="auto" if train_config.quantization and not train_config.enable_fsdp else None,
+                    torch_dtype=target_dtype,
+                )
+            else:
+                mistral_config = AutoConfig.from_pretrained(train_config.model_name)
+                mistral_config.use_cache = use_cache
+                with torch.device("meta"):
+                    model = MistralForCausalLM(mistral_config)
+        else:
+            model = MistralForCausalLM.from_pretrained(
+                train_config.model_name,
+                quantization_config=bnb_config,
+                attn_implementation="sdpa" if train_config.use_fast_kernels else None,
+                device_map="auto" if train_config.quantization and not train_config.enable_fsdp else None,
+                torch_dtype=target_dtype,
+            )
     else:
         raise ValueError(
-            f"Model type {config.model_type} is not supported. Please use llama or mllama model."
+            f"Model type {config.model_type} is not supported."
         )
     # Load the tokenizer and add special tokens
     tokenizer = AutoTokenizer.from_pretrained(
@@ -240,6 +313,14 @@ def main(**kwargs):
     )
     if not tokenizer.pad_token_id:
         tokenizer.pad_token_id = tokenizer.eos_token_id
+    # Qwen specific changes:
+    if not tokenizer.bos_token:
+        # assign the eos_token string to bos_token to prevent NoneType errors
+        tokenizer.bos_token = tokenizer.eos_token
+        if train_config.enable_fsdp and rank == 0:
+            print(f"--> Assigned {tokenizer.bos_token} as bos_token for Qwen compatibility.")
+    if not tokenizer.bos_token_id:
+        tokenizer.bos_token_id = tokenizer.eos_token_id
 
     # If there is a mismatch between tokenizer vocab size and embedding matrix,
     # throw a warning and then expand the embedding matrix
@@ -310,6 +391,15 @@ def main(**kwargs):
                     MllamaVisionEncoderLayer,
                 ],
             )
+        elif config.model_type == "gemma4": # gemma4 support (custom)
+            my_auto_wrapping_policy = fsdp_auto_wrap_policy(
+                model, 
+                [Gemma4DecoderLayer]
+            )
+        elif config.model_type == "qwen2": # qwen2 support (custom)
+            my_auto_wrapping_policy = fsdp_auto_wrap_policy(model, [Qwen2DecoderLayer])
+        elif config.model_type == "mistral": # mistral support (custom)
+            my_auto_wrapping_policy = fsdp_auto_wrap_policy(model, [MistralDecoderLayer])
         else:
             # Create the FSDP wrapper for LlamaDecoderLayer in text models
             my_auto_wrapping_policy = fsdp_auto_wrap_policy(model, [LlamaDecoderLayer])

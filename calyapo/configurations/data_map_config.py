@@ -6,23 +6,23 @@ ALL_DATA_MAPS = {
 
 # all variable_labels
 VARLABEL_DESC = {
-    'age': 'Age',
-    'partyid': 'Party Identity',
-    'dataset_id': 'Respondent ID',
-    'ideology': 'Political Ideology',
-    'trump_opinion': 'Donald Trump Favorability',
-    'oppose_abortion_senate': 'Importance of Senatorial Candidate Opposing Abortion Rights',
-    'defend_abortion_senate': 'Importance of Senatorial Candidate Defending Abortion Rights',
+    'age': 'age',
+    'partyid': 'party identity',
+    'dataset_id': 'respondent ID',
+    'ideology': 'political ideology',
+    'trump_opinion': 'Donald Trump favorability',
+    'oppose_abortion_senate': 'importance of Senatorial candidate opposing abortion access',
+    'defend_abortion_senate': 'importance of Senatorial candidate defending abortion access',
     'prop1_2024': 'California Proposition 1',
-    'sex': 'Biological Sex',
-    'gender': 'Gender Identity',
-    'education': 'Highest Education Level',
-    'race': 'Race',
-    'env_urban': 'Residence Urbanicity', 
-    'marital' : 'Marital Status', 
-    'oppose_immigration_senate' : 'Importance of Senatorial Candidate Immigration Toughness',
-    'biden_opinion' : 'Joe Biden Favorability',
-    'harris_opinion' : 'Kamala Harris Favorability'   
+    'sex': 'biological sex',
+    'gender': 'gender identity',
+    'education': 'highest education level achieved',
+    'race': 'racial identity',
+    'env_urban': 'degree of residence urbanization', 
+    'marital' : 'marital status', 
+    'oppose_immigration_senate' : 'importance of Senatorial candidate being tough on immigration',
+    'biden_opinion' : 'Joe Biden favorability',
+    'harris_opinion' : 'Kamala Harris favorability'   
 }
 
 # IGS finetuning variable maps
