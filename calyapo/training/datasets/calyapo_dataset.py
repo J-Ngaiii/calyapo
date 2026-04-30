@@ -55,23 +55,28 @@ class CalyapoDataset(Dataset):
         prompt_text = ann["prompt"]
         completion_text = ann["completion"]
         full_text = prompt_text + completion_text
+
+        prefix_token = self.tokenizer.bos_token
+        if prefix_token is None:
+            print(f"inputted tokenizer '{self.tokenizer.__name__}' has no .bos_token attribute -> using '{self.tokenizer.eos_token}' as place holder.")
+            prefix_token = self.tokenizer.eos_token
         
         # tokenize prompt (Context) - add BOS
         # need the length of this to calculate loss
         prompt_ids: Tokens = self.tokenizer.encode(
-            self.tokenizer.bos_token + prompt_text, 
+            prefix_token + prompt_text, 
             add_special_tokens=False
         )
         
         # tokenize full text (BOS + EOS)
         if self.predict_eos:
             example_ids: Tokens = self.tokenizer.encode(
-                self.tokenizer.bos_token + full_text + self.tokenizer.eos_token, 
+                prefix_token + full_text + self.tokenizer.eos_token, 
                 add_special_tokens=False
             )
         else:
             example_ids: Tokens = self.tokenizer.encode(
-                self.tokenizer.bos_token + full_text, 
+                prefix_token + full_text, 
                 add_special_tokens=False
             )
         
