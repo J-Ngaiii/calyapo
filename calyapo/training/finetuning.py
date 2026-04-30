@@ -203,7 +203,8 @@ def main(**kwargs):
                         else None
                     ),
                     torch_dtype=target_dtype, 
-                    low_cpu_mem_usage=train_config.low_cpu_mem_usage # ADDED
+                    low_cpu_mem_usage=train_config.low_cpu_mem_usage, # ADDED
+                    trust_remote_code=True # ADDED
                 )
         # ------ ADDED ------ 
             else:
@@ -225,6 +226,7 @@ def main(**kwargs):
                     else None
                 ),
                 torch_dtype=target_dtype,
+                trust_remote_code=True # added
             )
         # ------ ADDED ------ 
         print(f"--> Using language model of type '{config.model_type}' ") # shifted down
@@ -238,7 +240,8 @@ def main(**kwargs):
                     quantization_config=bnb_config,
                     attn_implementation="sdpa" if train_config.use_fast_kernels else None,
                     torch_dtype=target_dtype,
-                    low_cpu_mem_usage=train_config.low_cpu_mem_usage
+                    low_cpu_mem_usage=train_config.low_cpu_mem_usage, 
+                    trust_remote_code=True # added
                 )
             else:
                 qwen_config = AutoConfig.from_pretrained(train_config.model_name)
@@ -250,6 +253,7 @@ def main(**kwargs):
                 train_config.model_name,
                 quantization_config=bnb_config,
                 torch_dtype=target_dtype,
+                trust_remote_code=True
             )
     else:
         raise ValueError(

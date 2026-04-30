@@ -11,7 +11,7 @@
 #SBATCH --cpus-per-task=8
 
 #Number of GPUs
-#SBATCH --gres=gpu:A40:2 
+#SBATCH --gres=gpu:A40:1 
 #SBATCH --qos=a40_gpu3_normal
 
 # Wall clock limit:
@@ -26,6 +26,9 @@ mkdir -p slurm
 mkdir -p logs
 
 echo "Job started on $(hostname) at $(date)"
+
+echo nvidia-smi call:
+nvidia-smi
 
 # --- Storage Redirection ---
 # Redirecting cache to scratch to avoid Home quota issues
@@ -43,7 +46,7 @@ fi
 
 # Activate your virtual environment
 source /global/home/users/jonathanngai/miniconda3/etc/profile.d/conda.sh
-conda activate calypo
+conda activate calyapo
 if [ $? -ne 0 ]; then
   echo "Error: Could not activate virtual environment. Exiting."
   exit 1
@@ -58,15 +61,15 @@ fi
 export TOKENIZERS_PARALLELISM=true
 
 # Distributed Setup
-NPROC_PER_NODE=2                     # Match this to your --gres=gpu count
+NPROC_PER_NODE=1                     # Match this to your --gres=gpu count
 MASTER_PORT=$(expr 10000 + $(echo -n $SLURM_JOBID | tail -c 4)) # Random port to avoid collisions
 
 # Model/Data Params
-MODEL_NAME="meta-llama/Llama-2-7b-hf"
-MODEL_NICKNAME="llama2-7b" 
+# MODEL_NAME="meta-llama/Llama-2-7b-hf"
+# MODEL_NICKNAME="llama2-7b" 
 
-# MODEL_NAME="meta-llama/Llama-3.1-8B"
-# MODEL_NICKNAME="llama3.1-8b" 
+MODEL_NAME="meta-llama/Llama-3.1-8B"
+MODEL_NICKNAME="llama3.1-8b" 
 
 # MODEL_NAME="meta-llama/Llama-3.1-8B-Instruct"
 # MODEL_NICKNAME="llama3.1-8b-Instruct" 
@@ -77,14 +80,14 @@ MODEL_NICKNAME="llama2-7b"
 # MODEL_NAME="meta-llama/Llama-3.2-3B-Instruct"
 # MODEL_NICKNAME="llama3.2-3b-Instruct"
 
-# MODEL_NAME="meta-llama/Llama-3.3-70B-Instruct"
-# MODEL_NICKNAME="llama3.3-70b-Instruct"
-
 # MODEL_NAME="mistralai/Mistral-7B-v0.3"
 # MODEL_NICKNAME="mistral-7b"
 
-# MODEL_NAME="Qwen/Qwen2.5-7B-Instruct"
-# MODEL_NICKNAME="qwen2.5-7b-Instruct"
+# MODEL_NAME="Qwen/Qwen2.5-14B"
+# MODEL_NICKNAME="qwen2.5-14b"
+
+# MODEL_NAME="Qwen/Qwen2.5-14B-Instruct"
+# MODEL_NICKNAME="qwen2.5-14b-Instruct"
 
 DATASET="test_plan_dataset"
 OUTPUT_DIR="calyapo/training/checkpoints/${DATASET}"
@@ -95,13 +98,13 @@ GRADIENT_ACCUMULATION_STEPS=4
 DIST_CHECKPOINT_ROOT_FOLDER="/global/home/users/jonathanngai/calyapo/calyapo/training/checkpoints/${DATASET}"
 DIST_CHECKPOINT_FOLDER="fine-tuned"
 NUM_WORKERS_DATALOADER=2
-ONE_GPU=False
+ONE_GPU=Flase # only use for debugging
 WEIGHT_DECAY=0.1
 GAMMA=0.85
 LR=1e-5
 NUM_EPOCHS=3
-ENABLE_FSDP=True
-LOW_CPU_FSDP=True
+ENABLE_FSDP=False
+LOW_CPU_FSDP=False
 LOW_CPU_MEM_USAGE=True
 PURE_BF16=True
 

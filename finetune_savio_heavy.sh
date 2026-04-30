@@ -27,6 +27,9 @@ mkdir -p logs
 
 echo "Job started on $(hostname) at $(date)"
 
+echo "nvidia-smi check:"
+nvidia-smi
+
 # --- Storage Redirection ---
 # Redirecting cache to scratch to avoid Home quota issues
 export HF_HOME="/global/scratch/users/jonathanngai/hf_cache"
@@ -43,7 +46,7 @@ fi
 
 # Activate your virtual environment
 source /global/home/users/jonathanngai/miniconda3/etc/profile.d/conda.sh
-conda activate calypo
+conda activate calyapo
 if [ $? -ne 0 ]; then
   echo "Error: Could not activate virtual environment. Exiting."
   exit 1
@@ -80,11 +83,11 @@ MASTER_PORT=$(expr 10000 + $(echo -n $SLURM_JOBID | tail -c 4)) # Random port to
 # MODEL_NAME="mistralai/Mistral-7B-v0.3"
 # MODEL_NICKNAME="mistral-7b"
 
-# MODEL_NAME="Qwen/Qwen2.5-14B"
-# MODEL_NICKNAME="qwen2.5-14b"
+MODEL_NAME="Qwen/Qwen2.5-14B"
+MODEL_NICKNAME="qwen2.5-14b"
 
-MODEL_NAME="Qwen/Qwen2.5-14B-Instruct"
-MODEL_NICKNAME="qwen2.5-14b-Instruct"
+# MODEL_NAME="Qwen/Qwen2.5-14B-Instruct"
+# MODEL_NICKNAME="qwen2.5-14b-Instruct"
 
 DATASET="opinion_school_dataset"
 OUTPUT_DIR="calyapo/training/checkpoints/${DATASET}"
