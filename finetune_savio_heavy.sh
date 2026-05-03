@@ -83,13 +83,13 @@ MASTER_PORT=$(expr 10000 + $(echo -n $SLURM_JOBID | tail -c 4)) # Random port to
 # MODEL_NAME="mistralai/Mistral-7B-v0.3"
 # MODEL_NICKNAME="mistral-7b"
 
-MODEL_NAME="Qwen/Qwen2.5-14B"
-MODEL_NICKNAME="qwen2.5-14b"
+# MODEL_NAME="Qwen/Qwen2.5-14B"
+# MODEL_NICKNAME="qwen2.5-14b"
 
-# MODEL_NAME="Qwen/Qwen2.5-14B-Instruct"
-# MODEL_NICKNAME="qwen2.5-14b-Instruct"
+MODEL_NAME="Qwen/Qwen2.5-14B-Instruct"
+MODEL_NICKNAME="qwen2.5-14b-Instruct"
 
-DATASET="opinion_school_dataset"
+DATASET="presidents_to_abortion_dataset"
 OUTPUT_DIR="calyapo/training/checkpoints/${DATASET}"
 USE_PEFT=True
 BATCH_SIZE_TRAINING=4
