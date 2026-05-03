@@ -58,7 +58,7 @@ class CalyapoDataset(Dataset):
 
         prefix_token = self.tokenizer.bos_token
         if prefix_token is None:
-            print(f"inputted tokenizer '{self.tokenizer.name_or_path}' has no .bos_token attribute -> using '{self.tokenizer.eos_token}' as place holder.")
+            # print(f"inputted tokenizer '{self.tokenizer.name_or_path}' has no .bos_token attribute -> using '{self.tokenizer.eos_token}' as place holder.")
             prefix_token = self.tokenizer.eos_token
         
         # tokenize prompt (Context) - add BOS

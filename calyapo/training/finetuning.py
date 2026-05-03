@@ -58,7 +58,8 @@ from transformers import (
     BitsAndBytesConfig,
     LlamaForCausalLM,
     MllamaForConditionalGeneration,
-    AutoModelForCausalLM
+    AutoModelForCausalLM, 
+    MistralForCausalLM # for mistral support (custom)
 )
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
 from transformers.models.mistral.modeling_mistral import MistralDecoderLayer # mistral support (custom)
@@ -255,6 +256,31 @@ def main(**kwargs):
                 torch_dtype=target_dtype,
                 trust_remote_code=True
             )
+    elif config.model_type == "mistral": # mistral support (custom)
+        is_vision = False
+        if train_config.enable_fsdp and train_config.low_cpu_fsdp:
+            if rank == 0:
+                print(f"--> Rank 0: Loading Mistral model {train_config.model_name}...")
+                model = MistralForCausalLM.from_pretrained(
+                    train_config.model_name,
+                    quantization_config=bnb_config, 
+                    attn_implementation="sdpa" if train_config.use_fast_kernels else None,
+                    device_map="auto" if train_config.quantization and not train_config.enable_fsdp else None,
+                    torch_dtype=target_dtype,
+                )
+            else:
+                mistral_config = AutoConfig.from_pretrained(train_config.model_name)
+                mistral_config.use_cache = use_cache
+                with torch.device("meta"):
+                    model = MistralForCausalLM(mistral_config)
+        else:
+            model = MistralForCausalLM.from_pretrained(
+                train_config.model_name,
+                quantization_config=bnb_config,
+                attn_implementation="sdpa" if train_config.use_fast_kernels else None,
+                device_map="auto" if train_config.quantization and not train_config.enable_fsdp else None,
+                torch_dtype=target_dtype,
+            )
     else:
         raise ValueError(
             f"Model type {config.model_type} is not supported. Please use llama or mllama model."
@@ -339,6 +365,8 @@ def main(**kwargs):
             )
         elif config.model_type == "qwen2": # qwen2 support (custom)
             my_auto_wrapping_policy = fsdp_auto_wrap_policy(model, [Qwen2DecoderLayer])
+        elif config.model_type == "mistral": # mistral support (custom)
+            my_auto_wrapping_policy = fsdp_auto_wrap_policy(model, [MistralDecoderLayer])
         else:
             # Create the FSDP wrapper for LlamaDecoderLayer in text models
             my_auto_wrapping_policy = fsdp_auto_wrap_policy(model, [LlamaDecoderLayer])

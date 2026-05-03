@@ -6,6 +6,8 @@ from pathlib import Path
 import os
 from datetime import datetime
 import argparse
+import time
+import google.generativeai as genai
 
 # --- Configuration ---
 TP_ABBREVIATIONS = {
@@ -29,7 +31,69 @@ def load_data(file_path):
                 data.append(json.loads(line))
     return data
 
-def run_inference(engine_params, sampling_params, split, train_plan, input_path, output_folder, lora_path = None, verbose=False):
+def run_gemini_inference(model_name, sampling_params, split, train_plan, input_path, output_folder, verbose=False):
+    """Runs inference using Google Gemini API"""
+    if not os.path.exists(input_path):
+        raise ValueError(f"Input path '{input_path}' does not exist")
+
+    raw_data = load_data(input_path)
+    if not raw_data: return
+
+    # API Setup
+    api_key = os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        raise ValueError("Please set the GOOGLE_API_KEY environment variable.")
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel(model_name)
+
+    ts = get_timestamp()
+    save_dir = output_folder / Path(model_name)
+    save_dir.mkdir(parents=True, exist_ok=True)
+    results_file = save_dir / f"results_{split}_{TP_ABBREVIATIONS[train_plan]}_gemini_{ts}.jsonl"
+
+    print(f"Starting Gemini inference for {len(raw_data)} prompts...")
+
+    with open(results_file, "w") as f:
+        for i, item in enumerate(raw_data):
+            success = False
+            retries = 0
+            while not success and retries < 3:
+                try:
+                    response = model.generate_content(
+                        item["prompt"],
+                        generation_config=genai.types.GenerationConfig(
+                            temperature=sampling_params.get("temperature", 0),
+                            max_output_tokens=sampling_params.get("max_tokens", 2)
+                        )
+                    )
+                    generated_text = response.text.strip()
+                    success = True
+                except Exception as e:
+                    print(f"Error at index {i} (Retry {retries}): {e}")
+                    time.sleep(5) # Wait for rate limits
+                    retries += 1
+            
+            if not success: generated_text = "ERROR_FAILED_GENERATION"
+
+            true_label = item.get("completion", "").strip()
+            result = {
+                "index": i,
+                "prediction": generated_text,
+                "true_label": true_label,
+                "is_correct": generated_text.startswith(true_label),
+                "model": model_name
+            }
+            f.write(json.dumps(result) + "\n")
+            
+            if verbose and i % 20 == 0:
+                print(f"Processed {i}/{len(raw_data)}...")
+            
+            # Free tier safety sleep (adjust based on your tier)
+            time.sleep(1.0) 
+
+    print(f"Gemini results saved to: {results_file}")
+
+def run_inference(engine_params, sampling_params, split, train_plan, input_path, output_folder, chunk_size: int = 2000, lora_path = None, verbose=False):
     if not os.path.exists(input_path):
         raise ValueError(f"Input path '{input_path}' does not exist")
 
@@ -47,11 +111,13 @@ def run_inference(engine_params, sampling_params, split, train_plan, input_path,
         print(f"Number of Datapoints:    {len(raw_data)}")
         print(f"Training Plan:           {train_plan}")
         print(f"Plan using Abbreviation: {TP_ABBREVIATIONS.get(train_plan, 'no abbreviations found')}")
+        print(f"chunk_size:              {chunk_size}")
         print(f"-------------------------------------------------------------")
         
         print(f"\n------------------------Engine Stats------------------------")
         print(f"Initializing vLLM engine for model: '{model_name}'")
         print(f"quantization:            {engine_params.get('quantization', None)}")
+        print(f"num_gpus:                {engine_params.get('tensor_parallel_size', None)}")
         print(f"max_model_len:           {engine_params.get('max_model_len', None)}")
         print(f"max_num_seqs:            {engine_params.get('max_num_seqs', None)}")
         print(f"gpu_memory_utilization:  {engine_params.get('gpu_memory_utilization', None)}")
@@ -74,14 +140,26 @@ def run_inference(engine_params, sampling_params, split, train_plan, input_path,
             raise f"LoRA is enabled but inputted LoRA path '{lora_path}' does not exist"
         print("LoRA model detected")
         lora_request = LoRARequest("my_finetuned_model", 1, lora_path)
-        outputs = llm.generate(prompts, vllm_sampling_config, lora_request=lora_request)
     else:
-        outputs = llm.generate(prompts, vllm_sampling_config)
+        lora_request = None
+ 
+    # chunking logic
+    all_outputs = []
+    for i in range(0, len(prompts), chunk_size):
+        chunk = prompts[i : i + chunk_size]
+        print(f"Processing chunk {i//chunk_size + 1} ({len(chunk)} prompts)...")
+        
+        chunk_outputs = llm.generate(chunk, vllm_sampling_config, lora_request=lora_request)
+        all_outputs.extend(chunk_outputs)
+    outputs = all_outputs
 
     ts = get_timestamp()
     model_type = "lora" if engine_params.get('enable_lora', False) else "base"
-    results_file = output_folder / Path(model_name) / f"results_{split}_{TP_ABBREVIATIONS[train_plan]}_{model_type}_{ts}.jsonl"
-    config_file = output_folder / Path(model_name) / f"config_{split}_{TP_ABBREVIATIONS[train_plan]}_{model_type}_{ts}.json"
+    save_dir = output_folder / Path(model_name)
+    os.makedirs(save_dir, exist_ok=True)
+
+    results_file = save_dir / f"results_{split}_{TP_ABBREVIATIONS[train_plan]}_{model_type}_{ts}.jsonl"
+    config_file = save_dir / f"config_{split}_{TP_ABBREVIATIONS[train_plan]}_{model_type}_{ts}.json"
     full_config = {
         "timestamp": ts,
         "engine_params": engine_params,
@@ -113,31 +191,38 @@ def run_inference(engine_params, sampling_params, split, train_plan, input_path,
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fully runs offline inference pipeline.") 
     parser.add_argument("--train_plan", type=str, nargs='?', default='opinion_school', help="Name of training plan to finetune on.")
+    parser.add_argument("--model_name", type=str, nargs='?',  help="Name of model to finetune on.")
+    parser.add_argument("--run_keyword", type=str, nargs='?', default='aurora', help="Name of inference run")
     parser.add_argument("--adapter_folder", type=str, nargs='?', default=None, help="Folder with safetensor and json.")
-    parser.add_argument("--model_type", type=str, choices=['lora', 'base'], default='train')
+    parser.add_argument("--model_type", type=str, choices=['lora', 'base', 'gemini'], default='train')
     parser.add_argument("--split", type=str, choices=['train', 'val', 'test'], default='train')
+    parser.add_argument("--num_gpus", type=int, default=1)
+    parser.add_argument("--chunk_size", type=int, default=2000)
     parser.add_argument("--debug", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--verbose", action=argparse.BooleanOptionalAction, default=True)
     
     args = parser.parse_args()
     
     TRAIN_PLAN = args.train_plan
-    TRAIN_PATH = Path(f"calyapo/data/final/{TRAIN_PLAN}_train.jsonl")
-    VAL_PATH = Path(f"calyapo/data/final/{TRAIN_PLAN}_val.jsonl")
-    TEST_PATH = Path(f"calyapo/data/final/{TRAIN_PLAN}_test.jsonl")
-    OUTPUT_FOLDER = Path(f"inference_outputs/{TRAIN_PLAN}")
+    RUN_KEYWORD = args.run_keyword
+    TRAIN_PATH = Path(f"calyapo/data/final_{RUN_KEYWORD}/{TRAIN_PLAN}_train.jsonl")
+    VAL_PATH = Path(f"calyapo/data/final_{RUN_KEYWORD}/{TRAIN_PLAN}_val.jsonl")
+    TEST_PATH = Path(f"calyapo/data/final_{RUN_KEYWORD}/{TRAIN_PLAN}_test.jsonl")
+    OUTPUT_FOLDER = Path(f"inference_outputs/{TRAIN_PLAN}/outputs_{RUN_KEYWORD}")
     LORA_ADAPTER_PATH = Path(f"calyapo/training/checkpoints/{TRAIN_PLAN}_dataset/{args.adapter_folder}")
     
     USE_LORA = args.model_type.lower() == 'lora'
     SPLIT = args.split
 
     basic_inf_engine_config = {
-        "model": "meta-llama/Llama-2-7b-hf",
+        "model": args.model_name,
+        "tensor_parallel_size": args.num_gpus, 
         "quantization": "bitsandbytes",
         "load_format": "bitsandbytes",
         "dtype": "float16",
         "max_model_len": 212, # prompts are not that long
         "max_num_seqs": 96,
-        "gpu_memory_utilization": 0.85,
+        "gpu_memory_utilization": 0.75,
         "enforce_eager": True,
         "trust_remote_code": True, 
         "seed": 42
@@ -170,13 +255,25 @@ if __name__ == "__main__":
 
     OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
 
-    run_inference(
-        engine_params=engine_config, 
-        sampling_params=sampling_config, 
-        split=inf_split, 
-        train_plan=args.train_plan, 
-        input_path=input_path,
-        output_folder=OUTPUT_FOLDER, 
-        lora_path=lora_path, 
-        verbose=True
-    )
+    if args.model_type == 'gemini':
+        run_gemini_inference(
+            model_name=args.model_name,
+            sampling_params=sampling_config,
+            split=inf_split,
+            train_plan=args.train_plan,
+            input_path=input_path,
+            output_folder=OUTPUT_FOLDER,
+            verbose=True
+        )
+    else:
+        run_inference(
+            engine_params=engine_config, 
+            sampling_params=sampling_config, 
+            split=inf_split, 
+            train_plan=args.train_plan, 
+            input_path=input_path,
+            output_folder=OUTPUT_FOLDER, 
+            chunk_size=args.chunk_size, 
+            lora_path=lora_path, 
+            verbose=True
+        )
