@@ -20,6 +20,9 @@
 #SBATCH --output=logs/%j.out
 #SBATCH --error=logs/%j.err
 
+echo "nvidia-smi check:"
+nvidia-smi
+
 # --- Environment Setup ---
 # Create the directory specifically named 'slurm' for the #SBATCH output logs
 mkdir -p slurm
@@ -58,9 +61,9 @@ MASTER_PORT=$(expr 10000 + $(echo -n $SLURM_JOBID | tail -c 4)) # Random port to
 
 # Model/Data Params for opinion_school
 TRAIN_PLAN="opinion_school"
-# MODEL_NAME="meta-llama/Llama-3.1-8B"
-# MODEL_NICKNAME="llama3.1-8b"
-# ADAPTER_FOLDER="llama3.1-8b_wd0.1_gam0.85_lr1e-05_2026-04-26-06-20-31PM"
+MODEL_NAME="meta-llama/Llama-3.1-8B"
+MODEL_NICKNAME="llama3.1-8b"
+ADAPTER_FOLDER="llama3.1-8b_wd0.1_gam0.85_lr1e-05_2026-04-26-06-20-31PM"
 
 # MODEL_NAME="meta-llama/Llama-3.1-8B-Instruct"
 # MODEL_NICKNAME="llama3.1-8b-Instruct" 
@@ -85,8 +88,8 @@ ADAPTER_FOLDER="wdqwen2.5-14b-Instruct_wd0.1_gam0.85_lr1e-05_2026-05-03-12-43-51
 MODEL_TYPE="base" 
 # MODEL_TYPE="lora" 
 # SPLIT="train"
-# SPLIT="val"
-SPLIT="test"
+SPLIT="val"
+# SPLIT="test"
 
 RUN_KEYWORD="archon"
 NUM_GPUS=1
