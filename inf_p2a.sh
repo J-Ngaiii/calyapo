@@ -51,9 +51,9 @@ MASTER_PORT=$(expr 10000 + $(echo -n $SLURM_JOBID | tail -c 4)) # Random port to
 
 # Model/Data Params for opinion_school
 TRAIN_PLAN="presidents_to_abortion"
-# MODEL_NAME="meta-llama/Llama-3.1-8B"
-# MODEL_NICKNAME="llama3.1-8b"
-# ADAPTER_FOLDER="wdllama3.1-8b_wd0.1_gam0.85_lr1e-05_2026-05-03-06-47-00AM"
+MODEL_NAME="meta-llama/Llama-3.1-8B"
+MODEL_NICKNAME="llama3.1-8b"
+ADAPTER_FOLDER="wdllama3.1-8b_wd0.1_gam0.85_lr1e-05_2026-05-03-06-47-00AM"
 
 # MODEL_NAME="meta-llama/Llama-3.1-8B-Instruct"
 # MODEL_NICKNAME="llama3.1-8b-Instruct" 
@@ -63,9 +63,17 @@ TRAIN_PLAN="presidents_to_abortion"
 # MODEL_NICKNAME="llama3.2-3b"
 # ADAPTER_FOLDER="wdllama3.2-3b_wd0.1_gam0.85_lr1e-05_2026-05-03-10-00-02AM"
 
-MODEL_NAME="meta-llama/Llama-3.2-3B-Instruct"
-MODEL_NICKNAME="llama3.2-3b-Instruct"
-ADAPTER_FOLDER="wdllama3.2-3b-Instruct_wd0.1_gam0.85_lr1e-05_2026-05-03-10-11-25AM"
+# MODEL_NAME="meta-llama/Llama-3.2-3B-Instruct"
+# MODEL_NICKNAME="llama3.2-3b-Instruct"
+# ADAPTER_FOLDER="wdllama3.2-3b-Instruct_wd0.1_gam0.85_lr1e-05_2026-05-03-10-11-25AM"
+
+# MODEL_NAME="Qwen/Qwen2.5-14B"
+# MODEL_NICKNAME="qwen2.5-14b"
+# ADAPTER_FOLDER="wdqwen2.5-14b_wd0.1_gam0.85_lr1e-05_2026-05-03-11-08-16AM"
+
+# MODEL_NAME="Qwen/Qwen2.5-14B-Instruct"
+# MODEL_NICKNAME="qwen2.5-14b-Instruct"
+# ADAPTER_FOLDER="wdqwen2.5-14b-Instruct_wd0.1_gam0.85_lr1e-05_2026-05-03-11-19-09AM"
 
 # MODEL_TYPE="base" 
 MODEL_TYPE="lora" 

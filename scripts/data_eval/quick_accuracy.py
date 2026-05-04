@@ -23,13 +23,13 @@ def calculate_accuracy(results_path: str, split: str, model_name: str):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Runs analysis of offline inference data.") 
     parser.add_argument("--train_plan", type=str, nargs='?', default='opinion_school', help="Name of training plan.")
-    parser.add_argument("--split", type=str, nargs='?', default='train', help="Dataset partitin to analyze.")
     parser.add_argument("--run_keyword", type=str, nargs='?', default='archon', help="Keyword corresponding with inference run.")
-    parser.add_argument("--model_idx", type=str, nargs='?', default='5', help="Integer assigned to a model.")
-    parser.add_argument("--jsonl", type=str, nargs='?', default='results_test_os_base_20260428_024715.jsonl', help="Exact json file with results.")
+    parser.add_argument("--model_idx", type=str, nargs='?', default='1', help="Integer assigned to a model.")
+    parser.add_argument("--jsonl", type=str, nargs='?', default='results_validation_os_lora_20260503_182103.jsonl', help="Exact json file with results.")
     
     args = parser.parse_args()
     
+    split = args.jsonl.split('_')[1]
     LOOKUP = {
         '1' : f"meta-llama/Llama-3.1-8B",
         '2' : f"meta-llama/Llama-3.1-8B-Instruct", 
@@ -40,4 +40,4 @@ if __name__ == "__main__":
     }
 
     IN_PATH = f"inference_outputs/{args.train_plan}/outputs_{args.run_keyword}/{LOOKUP[args.model_idx]}/{args.jsonl}"
-    calculate_accuracy(results_path=IN_PATH, split=args.split, model_name=LOOKUP[args.model_idx].split('/')[1])
+    calculate_accuracy(results_path=IN_PATH, split=split, model_name=LOOKUP[args.model_idx].split('/')[1])
