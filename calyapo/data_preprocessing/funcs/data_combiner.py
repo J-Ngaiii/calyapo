@@ -1,10 +1,10 @@
 import json
 import os
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Iterable
 
 from calyapo.configurations.data_map_config import TRAIN_PLANS, VARLABEL_DESC
-from calyapo.configurations.config import UNIVERSAL_FINAL_FOLDER, UNIVERSAL_NA_FILLER
+from calyapo.configurations.config import UNIVERSAL_FINAL_FOLDER, UNIVERSAL_NA_FILLER, IGS_SURVEY_WAVE_DESC, POLLING_FIRM_DESC
 from calyapo.data_preprocessing.cleaning_objects import DataPackage, Individual
 from calyapo.utils.persistence import *
 
@@ -25,25 +25,30 @@ def flatten_data_to_llama_format(raw_data_list: List[Dict], split: str) -> List[
     Flattens Individuals into MCQ Prompt/Completion pairs.
     """
     flattened_examples = []
+    meta_configs = []
     
     for entry in raw_data_list:
-        # 1. Base Context
-        time_period = entry.get('time', 'Unknown')
-        dataset_name = entry.get('dataset', 'Unknown')
+        # track IDS here
+        time_label = entry.get('time', 'Unknown')
+        polling_date = IGS_SURVEY_WAVE_DESC.get(time_label, 'Unkown')
+        dataset_label = entry.get('dataset', 'Unknown')
+        polling_firm = POLLING_FIRM_DESC.get(dataset_label, 'Unkown')
         demog_str = format_demographics(entry.get('demog', {}))
         
-        narrative = f"This is a respondent from the {dataset_name} dataset in {time_period}."
+        narrative_first_person_time_and_poll = f"You are a survey respondent based in California from the {polling_date} {polling_firm} polling wave."
+        narrative_classic = f"This is a respondent from the {dataset_label} dataset in {time_label}."
+        narrative_simple = f"This is a respondent."
+        demog_prelude_first_person = f"You have the following demographic profile"
+        demog_prelude_simple = f"Demographics"
         
-        # 2. Get Section Data
         section_data = entry.get(split, {})
         
-        # These maps are parallel
         text_map = section_data.get('var_label2qst_text', {})
         choices_map = section_data.get('var_label2qst_choices', {})
-        # This one contains the answer logic {var: {option_text, option_letter}}
+        # options map contains the answer logic {var: {option_text, option_letter}}
         options_map = section_data.get('var_label2qst_option', {})
         
-        # 3. Create Examples
+        # each datapoint is a unique individual-question pair so now we iterate thru questions
         for var_label, answer_data in options_map.items():
             
             # answer_data is a dictionary, e.g. {'option_letter': 'A', 'option_text': 'Yes'}
@@ -65,25 +70,33 @@ def flatten_data_to_llama_format(raw_data_list: List[Dict], split: str) -> List[
             question_text = text_map.get(var_label, "")
             choices_block = choices_map.get(var_label, "")
             question_varlabel_desc = VARLABEL_DESC[var_label]
+            question_prelude_first_person = f"Answer the following question about {question_varlabel_desc} according to your demographic profile"
+            question_prelude_simple = f"Question"
 
-            # construct P=prompt
+            # construct prompt
             prompt = (
-                f"{narrative}\n"
-                f"Demographics: {demog_str}.\n"
-                f"Question ({question_varlabel_desc}): {question_text}\n"
+                f"{narrative_classic}\n"
+                f"{demog_prelude_simple}: {demog_str}.\n"
+                f"{question_prelude_simple}: {question_text}\n"
                 f"{choices_block}\n"
                 f"Answer:"
             )
             
-            # Construct Completion
-            completion = f" {target_letter}"
+            # construct completiion target (just the target letter)
+            completion = f"{target_letter}"
             
             flattened_examples.append({
                 "prompt": prompt,
                 "completion": completion
             })
             
-    return flattened_examples
+            meta_configs.append({
+                'id': entry.get('id', 'Unknown'), 
+                'uniqueid': entry.get('uniqueid', 'Unknown'), 
+                'time_period': entry.get('time', 'Unknown'), 
+                'dataset': entry.get('dataset', 'Unknown'), 
+            })
+    return flattened_examples, meta_configs
 
 def save_jsonl(data: List[Dict], filename: str, out_path: str = None, verbose: bool = False):
     if out_path is None:
@@ -96,16 +109,27 @@ def save_jsonl(data: List[Dict], filename: str, out_path: str = None, verbose: b
             f.write(json.dumps(entry) + "\n")
 
 def split_combine(
-        package: DataPackage, 
-        out_path: str = None, 
-        save: bool = True, 
-        debug: bool = False, 
+        package: DataPackage,
+        out_path: str = None,
+        save: bool = True,
+        debug: bool = False,
         verbose: bool = True
     ):
-    train_data = []
-    val_data = []
-    test_data = []
-        
+    data_dict = {
+        'train' : {
+            'data' : [], # when function finishes this will be list of {prompt : completion} dictionaries
+            'meta' : []
+        },
+        'val' : {
+            'data' : [],
+            'meta' : []
+        },
+        'test' : {
+            'data' : [],
+            'meta' : []
+        }
+    }
+       
     # needs to be able to take different packages in memory
     if verbose:
         print(f"(split_combine) There are '{len(package['dataset_packages'])}' datasets to process")
@@ -114,22 +138,23 @@ def split_combine(
         if debug:
             print(f"(split_combine | Debug) Data Package: {package}")
 
-        train_indiv_maps: List[Dict] = inpack.get('train')
-        val_indiv_maps: List[Dict] = inpack.get('val')
-        test_indiv_maps: List[Dict] = inpack.get('test')
-        train_data.extend(flatten_data_to_llama_format(train_indiv_maps, 'train'))
-        val_data.extend(flatten_data_to_llama_format(val_indiv_maps, 'val'))
-        test_data.extend(flatten_data_to_llama_format(test_indiv_maps, 'test'))
+        for split, split_dict in data_dict.items():
+            indiv_map: List[Dict] = inpack.get(split)
+            data, meta = flatten_data_to_llama_format(indiv_map, split)
+            split_dict['data'].extend(data)
+            split_dict['meta'].extend(meta)
 
     if save:
         assert out_path is not None, f"(split_combine | WARNING) Cannot have no out_path if saving."
-        save_jsonl(train_data, f"{package.train_plan}_train.jsonl", out_path, verbose)
-        save_jsonl(val_data, f"{package.train_plan}_val.jsonl", out_path, verbose)
-        save_jsonl(test_data, f"{package.train_plan}_test.jsonl", out_path, verbose)
+        for split, split_dict in data_dict.items():
+            save_jsonl(split_dict['data'], f"{package.train_plan}_{split}.jsonl", out_path, verbose)
+            save_jsonl(split_dict['meta'], f"{package.train_plan}_{split}_meta.jsonl", out_path, verbose)
 
-    return {
-        "train": train_data,
-        "val": val_data,
-        "test": test_data
-    }
+
+    out_pack = DataPackage(package.dataset_name, package.train_plan, package.time_period)
+    for split, split_dict in data_dict.items():
+        out_pack[split] = split_dict['data']
+        out_pack[f"{split}_meta"] = split_dict['meta']
+
+    return out_pack
 
