@@ -7,7 +7,8 @@ import os
 from datetime import datetime
 import argparse
 import time
-import google.generativeai as genai
+# import google.generativeai as genai
+from openai import OpenAI
 
 # --- Configuration ---
 TP_ABBREVIATIONS = {
@@ -31,67 +32,67 @@ def load_data(file_path):
                 data.append(json.loads(line))
     return data
 
-def run_gemini_inference(model_name, sampling_params, split, train_plan, input_path, output_folder, verbose=False):
-    """Runs inference using Google Gemini API"""
-    if not os.path.exists(input_path):
-        raise ValueError(f"Input path '{input_path}' does not exist")
+# def run_gemini_inference(model_name, sampling_params, split, train_plan, input_path, output_folder, verbose=False):
+    # """Runs inference using Google Gemini API"""
+    # if not os.path.exists(input_path):
+    #     raise ValueError(f"Input path '{input_path}' does not exist")
 
-    raw_data = load_data(input_path)
-    if not raw_data: return
+    # raw_data = load_data(input_path)
+    # if not raw_data: return
 
-    # API Setup
-    api_key = os.getenv("GOOGLE_API_KEY")
-    if not api_key:
-        raise ValueError("Please set the GOOGLE_API_KEY environment variable.")
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel(model_name)
+    # # API Setup
+    # api_key = os.getenv("GOOGLE_API_KEY")
+    # if not api_key:
+    #     raise ValueError("Please set the GOOGLE_API_KEY environment variable.")
+    # genai.configure(api_key=api_key)
+    # model = genai.GenerativeModel(model_name)
 
-    ts = get_timestamp()
-    save_dir = output_folder / Path(model_name)
-    save_dir.mkdir(parents=True, exist_ok=True)
-    results_file = save_dir / f"results_{split}_{TP_ABBREVIATIONS[train_plan]}_gemini_{ts}.jsonl"
+    # ts = get_timestamp()
+    # save_dir = output_folder / Path(model_name)
+    # save_dir.mkdir(parents=True, exist_ok=True)
+    # results_file = save_dir / f"results_{split}_{TP_ABBREVIATIONS[train_plan]}_gemini_{ts}.jsonl"
 
-    print(f"Starting Gemini inference for {len(raw_data)} prompts...")
+    # print(f"Starting Gemini inference for {len(raw_data)} prompts...")
 
-    with open(results_file, "w") as f:
-        for i, item in enumerate(raw_data):
-            success = False
-            retries = 0
-            while not success and retries < 3:
-                try:
-                    response = model.generate_content(
-                        item["prompt"],
-                        generation_config=genai.types.GenerationConfig(
-                            temperature=sampling_params.get("temperature", 0),
-                            max_output_tokens=sampling_params.get("max_tokens", 2)
-                        )
-                    )
-                    generated_text = response.text.strip()
-                    success = True
-                except Exception as e:
-                    print(f"Error at index {i} (Retry {retries}): {e}")
-                    time.sleep(5) # Wait for rate limits
-                    retries += 1
+    # with open(results_file, "w") as f:
+    #     for i, item in enumerate(raw_data):
+    #         success = False
+    #         retries = 0
+    #         while not success and retries < 3:
+    #             try:
+    #                 response = model.generate_content(
+    #                     item["prompt"],
+    #                     generation_config=genai.types.GenerationConfig(
+    #                         temperature=sampling_params.get("temperature", 0),
+    #                         max_output_tokens=sampling_params.get("max_tokens", 2)
+    #                     )
+    #                 )
+    #                 generated_text = response.text.strip()
+    #                 success = True
+    #             except Exception as e:
+    #                 print(f"Error at index {i} (Retry {retries}): {e}")
+    #                 time.sleep(5) # Wait for rate limits
+    #                 retries += 1
             
-            if not success: generated_text = "ERROR_FAILED_GENERATION"
+    #         if not success: generated_text = "ERROR_FAILED_GENERATION"
 
-            true_label = item.get("completion", "").strip()
-            result = {
-                "index": i,
-                "prediction": generated_text,
-                "true_label": true_label,
-                "is_correct": generated_text.startswith(true_label),
-                "model": model_name
-            }
-            f.write(json.dumps(result) + "\n")
+    #         true_label = item.get("completion", "").strip()
+    #         result = {
+    #             "index": i,
+    #             "prediction": generated_text,
+    #             "true_label": true_label,
+    #             "is_correct": generated_text.startswith(true_label),
+    #             "model": model_name
+    #         }
+    #         f.write(json.dumps(result) + "\n")
             
-            if verbose and i % 20 == 0:
-                print(f"Processed {i}/{len(raw_data)}...")
+    #         if verbose and i % 20 == 0:
+    #             print(f"Processed {i}/{len(raw_data)}...")
             
-            # Free tier safety sleep (adjust based on your tier)
-            time.sleep(1.0) 
+    #         # Free tier safety sleep (adjust based on your tier)
+    #         time.sleep(1.0) 
 
-    print(f"Gemini results saved to: {results_file}")
+    # print(f"Gemini results saved to: {results_file}")
 
 def run_inference(engine_params, sampling_params, split, train_plan, input_path, output_folder, chunk_size: int = 2000, lora_path = None, verbose=False):
     if not os.path.exists(input_path):
@@ -256,15 +257,17 @@ if __name__ == "__main__":
     OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
 
     if args.model_type == 'gemini':
-        run_gemini_inference(
-            model_name=args.model_name,
-            sampling_params=sampling_config,
-            split=inf_split,
-            train_plan=args.train_plan,
-            input_path=input_path,
-            output_folder=OUTPUT_FOLDER,
-            verbose=True
-        )
+        # run_gemini_inference(
+        #     model_name=args.model_name,
+        #     sampling_params=sampling_config,
+        #     split=inf_split,
+        #     train_plan=args.train_plan,
+        #     input_path=input_path,
+        #     output_folder=OUTPUT_FOLDER,
+        #     verbose=True
+        # )
+        print(f"Gemini mode not implemented yet")
+        pass
     else:
         run_inference(
             engine_params=engine_config, 

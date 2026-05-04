@@ -51,24 +51,21 @@ MASTER_PORT=$(expr 10000 + $(echo -n $SLURM_JOBID | tail -c 4)) # Random port to
 
 # Model/Data Params for opinion_school
 TRAIN_PLAN="presidents_to_abortion"
-MODEL_NAME="meta-llama/Llama-3.1-8B"
-MODEL_NICKNAME="llama3.1-8b"
-ADAPTER_FOLDER="llama3.1-8b_wd0.1_gam0.85_lr1e-05_2026-04-12-04-58-33PM"
+# MODEL_NAME="meta-llama/Llama-3.1-8B"
+# MODEL_NICKNAME="llama3.1-8b"
+# ADAPTER_FOLDER="wdllama3.1-8b_wd0.1_gam0.85_lr1e-05_2026-05-03-06-47-00AM"
 
 # MODEL_NAME="meta-llama/Llama-3.1-8B-Instruct"
 # MODEL_NICKNAME="llama3.1-8b-Instruct" 
-# ADAPTER_FOLDER="llama3.1-8b-Instruct_wd0.1_gam0.85_lr1e-05_2026-04-12-04-41-42PM"
+# ADAPTER_FOLDER="wdllama3.1-8b-Instruct_wd0.1_gam0.85_lr1e-05_2026-05-03-07-32-07AM"
 
 # MODEL_NAME="meta-llama/Llama-3.2-3B"
 # MODEL_NICKNAME="llama3.2-3b"
-# ADAPTER_FOLDER="llama3.2-3b_wd0.1_gam0.85_lr1e-05_2026-04-13-02-04-15AM"
+# ADAPTER_FOLDER="wdllama3.2-3b_wd0.1_gam0.85_lr1e-05_2026-05-03-10-00-02AM"
 
-# MODEL_NAME="meta-llama/Llama-3.2-3B-Instruct"
-# MODEL_NICKNAME="llama3.2-3b-Instruct"
-# ADAPTER_FOLDER="llama3.2-3b-Instruct_wd0.1_gam0.85_lr1e-05_2026-04-13-02-03-23AM"
-
-# MODEL_NAME="meta-llama/Llama-2-7b-hf"
-# MODEL_NICKNAME="llama2-7b" 
+MODEL_NAME="meta-llama/Llama-3.2-3B-Instruct"
+MODEL_NICKNAME="llama3.2-3b-Instruct"
+ADAPTER_FOLDER="wdllama3.2-3b-Instruct_wd0.1_gam0.85_lr1e-05_2026-05-03-10-11-25AM"
 
 # MODEL_TYPE="base" 
 MODEL_TYPE="lora" 

@@ -36,15 +36,16 @@ def validate_jsonl_by_label(jsonl_path: str):
     
     return stats
 
-def primary_checker(train_plan):
-    train_path = UNIVERSAL_FINAL_FOLDER / f"{train_plan}_train.jsonl"
-    val_path = UNIVERSAL_FINAL_FOLDER / f"{train_plan}_val.jsonl"
+def primary_checker(train_plan, run_keyword):
+    train_path = Path(f'calyapo/data/final_{run_keyword}') / f"{train_plan}_train.jsonl"
+    val_path = Path(f'calyapo/data/final_{run_keyword}') / f"{train_plan}_val.jsonl"
+    train_path = Path(f'calyapo/data/final_{run_keyword}') / f"{train_plan}_train.jsonl"
+    test_path = Path(f'calyapo/data/final_{run_keyword}') / f"{train_plan}_test.jsonl"
 
     results = {}
 
-    for name, path in [("train", train_path), ("val", val_path)]:
+    for name, path in [("train", train_path), ("val", val_path), ("test", test_path)]:
         if path.exists():
-            # 2. Count lines in the JSONL file
             with open(path, 'r', encoding='utf-8') as f:
                 count = sum(1 for line in f)
             results[name] = count
@@ -58,10 +59,11 @@ def primary_checker(train_plan):
 
 def main():
     parser = argparse.ArgumentParser(description="Runs checks on final JSONL datafiles") 
-    parser.add_argument("--train_plan", type=str, nargs='?', default='test_plan', help="Name of training plan to check jsonl files for.")
+    parser.add_argument("--train_plan", type=str, nargs='?', default='opinion_school', help="Name of training plan to check jsonl files for.")
+    parser.add_argument("--run_keyword", type=str, nargs='?', default='archon', help="Name of training plan to check jsonl files for.")
 
     args = parser.parse_args()
 
-    primary_checker(args.train_plan)
+    primary_checker(args.train_plan, args.run_keyword)
 if __name__ == "__main__":
     main()
