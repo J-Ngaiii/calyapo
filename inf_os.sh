@@ -62,9 +62,9 @@ MASTER_PORT=$(expr 10000 + $(echo -n $SLURM_JOBID | tail -c 4)) # Random port to
 
 # Model/Data Params for opinion_school
 TRAIN_PLAN="opinion_school"
-# MODEL_NAME="meta-llama/Llama-3.1-8B"
-# MODEL_NICKNAME="llama3.1-8b"
-# ADAPTER_FOLDER="llama3.1-8b_wd0.1_gam0.85_lr1e-05_2026-04-26-06-20-31PM"
+MODEL_NAME="meta-llama/Llama-3.1-8B"
+MODEL_NICKNAME="llama3.1-8b"
+ADAPTER_FOLDER="wdllama3.1-8b_wd0.1_gam0.85_lr1e-05_2026-05-03-06-46-46AM"
 
 # MODEL_NAME="meta-llama/Llama-3.1-8B-Instruct"
 # MODEL_NICKNAME="llama3.1-8b-Instruct" 
@@ -82,14 +82,14 @@ TRAIN_PLAN="opinion_school"
 # MODEL_NICKNAME="qwen2.5-14b"
 # ADAPTER_FOLDER="wdqwen2.5-14b_wd0.1_gam0.85_lr1e-05_2026-05-03-12-43-16AM"
 
-MODEL_NAME="Qwen/Qwen2.5-14B-Instruct"
-MODEL_NICKNAME="qwen2.5-14b-Instruct"
-ADAPTER_FOLDER="wdqwen2.5-14b-Instruct_wd0.1_gam0.85_lr1e-05_2026-05-03-12-43-51AM"
+# MODEL_NAME="Qwen/Qwen2.5-14B-Instruct"
+# MODEL_NICKNAME="qwen2.5-14b-Instruct"
+# ADAPTER_FOLDER="wdqwen2.5-14b-Instruct_wd0.1_gam0.85_lr1e-05_2026-05-03-12-43-51AM"
 
-MODEL_TYPE="base" 
-# MODEL_TYPE="lora" 
-# SPLIT="train"
-SPLIT="val"
+# MODEL_TYPE="base" 
+MODEL_TYPE="lora" 
+SPLIT="train"
+# SPLIT="val"
 # SPLIT="test"
 
 RUN_KEYWORD="archon"
