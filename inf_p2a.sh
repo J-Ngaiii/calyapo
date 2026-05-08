@@ -2,17 +2,18 @@
 # from https://docs-research-it.berkeley.edu/services/high-performance-computing/user-guide/running-your-jobs/scheduler-examples/
 #SBATCH --job-name=calyapo_inference_p2a
 #SBATCH --account=fc_hartmanl2
-#SBATCH --partition=savio3_gpu
+#SBATCH --partition=savio4_gpu
 #SBATCH --nodes=1
-#SBATCH --ntasks=2
+#SBATCH --ntasks=1
 
 # Processors per task:
 # Eight times the number for A40 in savio3_gpu
-#SBATCH --cpus-per-task=8
+# Four times the number of GPUs for A500 in savio4_gpu
+#SBATCH --cpus-per-task=4
 
 #Number of GPUs
-#SBATCH --gres=gpu:A40:1
-#SBATCH --qos=a40_gpu3_normal
+#SBATCH --gres=gpu:A5000:1
+#SBATCH --qos=a5k_gpu4_normal
 
 # Wall clock limit:
 #SBATCH --time=10:00:00
@@ -27,6 +28,11 @@ nvidia-smi
 # Create the directory specifically named 'slurm' for the #SBATCH output logs
 mkdir -p slurm
 mkdir -p logs
+
+# don't exhaust ur memory
+export HF_HOME="/global/scratch/users/jonathanngai/hf_cache"
+export TORCH_HOME="/global/scratch/users/jonathanngai/torch_cache"
+mkdir -p $HF_HOME $TORCH_HOME
 
 # Navigate to your project directory
 cd /global/home/users/jonathanngai/calyapo
@@ -80,9 +86,9 @@ ADAPTER_FOLDER="wdqwen2.5-14b-Instruct_wd0.1_gam0.85_lr1e-05_2026-05-03-11-19-09
 
 MODEL_TYPE="base" 
 # MODEL_TYPE="lora" 
-# SPLIT="train"
+SPLIT="train"
 # SPLIT="val"
-SPLIT="test"
+# SPLIT="test"
 
 RUN_KEYWORD="archon"
 NUM_GPUS=1

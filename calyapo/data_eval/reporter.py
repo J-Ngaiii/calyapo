@@ -395,3 +395,60 @@ class Reporter:
         
         if self.verbose: 
             print(f"( distributional_accuracy | Reporter) Success: Weighted and Unweighted metrics saved to {out_path}")
+
+    # -------------
+    # Geo Analysis
+    # -------------
+    def generate_geographic_reports(self, split='test', geo_level='county'):
+    """
+    Wrapper to run both Ground Truth and Synthetic geographic analyses.
+    """
+    for mode in ['ground_truth', 'synthetic']:
+        if self.verbose:
+            print(f"Running {mode} geographic analysis...")
+        self._plot_geo_core(split=split, geo_level=geo_level, mode=mode)
+
+def _plot_geo_core(self, split: str, geo_level: str, mode: str):
+    tabs = self.load_tabulars(splits=[split])
+    df = tabs[split]
+    
+    igs_path = self.root / "calyapo" / "data" / "intermediate" / "igs"
+    geo_df = pd.concat([pd.read_csv(f, usecols=['calyapo_uniqueid', 'COUNTY', 'ZIP'], dtype=str) 
+                        for f in igs_path.glob("*.csv")]).drop_duplicates('calyapo_uniqueid')
+    df = df.merge(geo_df, left_on='uniqueid', right_on='calyapo_uniqueid', how='left')
+
+    shape_path = self.root / "calyapo" / "data" / "eval" / ("CA_Counties.shp" if geo_level == 'county' else "CA_ZCTAs.shp")
+    gdf = gpd.read_file(shape_path)
+    shape_join_col = 'NAME' if geo_level == 'county' else 'ZCTA5CE20'
+    df_geo_col = 'COUNTY' if geo_level == 'county' else 'ZIP'
+
+    candidates = ["Donald Trump", "Joe Biden", "Kamala Harris"]
+
+    if mode == 'ground_truth':
+        model_cols = ['true_answer']
+    else:
+        model_cols = [c for c in df.columns if c.endswith('_pred')]
+
+    for col in model_cols:
+        for candidate in candidates:
+            sub_df = df[df['topic'].str.contains(candidate, case=False, na=False)].copy()
+            if sub_df.empty: continue
+
+            # calculate proportion of Choice A (Strongly Favorable)
+            stats = sub_df.groupby(df_geo_col)[col].apply(
+                lambda x: (x.astype(str).str.contains('A', na=False)).mean()
+            ).reset_index(name='prop')
+
+            merged = gdf.merge(stats, left_on=shape_join_col, right_on=df_geo_col, how='left')
+            
+            fig, ax = plt.subplots(1, 1, figsize=(10, 12))
+            merged.plot(column='prop', cmap='RdYlBu_r', legend=True, ax=ax, missing_kwds={'color': 'lightgrey'})
+            
+            title = f"{mode.upper()}: {candidate}\nSource: {col}"
+            ax.set_title(title, fontsize=14)
+            ax.axis('off')
+
+            out_dir = self.results_folder / "maps" / split / mode
+            out_dir.mkdir(parents=True, exist_ok=True)
+            plt.savefig(out_dir / f"{candidate.replace(' ', '_')}_{col}_map.png", dpi=300)
+            plt.close()

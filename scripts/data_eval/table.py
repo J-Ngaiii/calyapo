@@ -7,13 +7,13 @@ from calyapo.data_eval.tabularizer import Tabularizer
 def main():
     parser = argparse.ArgumentParser(description="Runs analysis of offline inference data.") 
     parser.add_argument("--train_plan", type=str, nargs='?', default='opinion_school', help="Name of training plan.")
-    parser.add_argument("--run_keyword", type=str, nargs='?', default='aurora', help="Keyword for the report folder.")
+    parser.add_argument("--run_keyword", type=str, nargs='?', default='archon', help="Keyword for the report folder.")
     parser.add_argument("--verbose", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--debug", action=argparse.BooleanOptionalAction, default=True)
     args = parser.parse_args()
 
     LLAMA_SUBFOLDER = "meta-llama"
-    QWEN_SUBFOLDER = "qwen"
+    QWEN_SUBFOLDER = "Qwen"
     LLAMA_MODELS_FINETUNED = [
         'Llama-3.1-8B', 
         'Llama-3.1-8B-Instruct', 

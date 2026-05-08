@@ -7,7 +7,8 @@ import os
 from datetime import datetime
 import argparse
 import time
-# import google.generativeai as genai
+# from google import genai
+# from google.genai import types
 from openai import OpenAI
 
 # --- Configuration ---
@@ -32,67 +33,99 @@ def load_data(file_path):
                 data.append(json.loads(line))
     return data
 
-# def run_gemini_inference(model_name, sampling_params, split, train_plan, input_path, output_folder, verbose=False):
-    # """Runs inference using Google Gemini API"""
-    # if not os.path.exists(input_path):
-    #     raise ValueError(f"Input path '{input_path}' does not exist")
+def run_gemini_inference(model_name, sampling_params, split, train_plan, input_path, output_folder, verbose=False):
+    """Runs Gemini Batch inference using Llama-formatted JSONL input"""
+    
+    # 1. Initialize Client
+    api_key = os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        raise ValueError("Please set the GOOGLE_API_KEY environment variable.")
+    client = genai.Client(api_key=api_key)
 
-    # raw_data = load_data(input_path)
-    # if not raw_data: return
+    raw_data = load_data(input_path)
+    if not raw_data:
+        return
 
-    # # API Setup
-    # api_key = os.getenv("GOOGLE_API_KEY")
-    # if not api_key:
-    #     raise ValueError("Please set the GOOGLE_API_KEY environment variable.")
-    # genai.configure(api_key=api_key)
-    # model = genai.GenerativeModel(model_name)
+    # 2. Prepare the Batch Request File (.jsonl)
+    batch_input_path = output_folder / f"temp_gemini_batch_{split}.jsonl"
+    if verbose: print(f"Preparing batch file for {len(raw_data)} items...")
+    
+    with open(batch_input_path, 'w') as f:
+        for i, item in enumerate(raw_data):
+            request_obj = {
+                "key": f"idx_{i}", 
+                "request": {
+                    "contents": [{"parts": [{"text": item["prompt"]}]}],
+                    "generation_config": {
+                        "temperature": sampling_params.get("temperature", 0),
+                        "max_output_tokens": sampling_params.get("max_tokens", 2)
+                    }
+                }
+            }
+            f.write(json.dumps(request_obj) + '\n')
 
-    # ts = get_timestamp()
-    # save_dir = output_folder / Path(model_name)
-    # save_dir.mkdir(parents=True, exist_ok=True)
-    # results_file = save_dir / f"results_{split}_{TP_ABBREVIATIONS[train_plan]}_gemini_{ts}.jsonl"
+    # 3. Upload to Gemini File API
+    if verbose: print(f"Uploading file to Gemini API...")
+    uploaded_file = client.files.upload(
+        file=str(batch_input_path),
+        config=types.UploadFileConfig(display_name=f'input_{train_plan}_{split}')
+    )
 
-    # print(f"Starting Gemini inference for {len(raw_data)} prompts...")
+    # 4. Submit Batch Job
+    if verbose: print(f"Creating batch job for model: {model_name}...")
+    batch_job = client.batches.create(
+        model=model_name,
+        src=uploaded_file.name,
+        config={'display_name': f'job_{train_plan}_{split}_{get_timestamp()}'}
+    )
+    job_name = batch_job.name
 
-    # with open(results_file, "w") as f:
-    #     for i, item in enumerate(raw_data):
-    #         success = False
-    #         retries = 0
-    #         while not success and retries < 3:
-    #             try:
-    #                 response = model.generate_content(
-    #                     item["prompt"],
-    #                     generation_config=genai.types.GenerationConfig(
-    #                         temperature=sampling_params.get("temperature", 0),
-    #                         max_output_tokens=sampling_params.get("max_tokens", 2)
-    #                     )
-    #                 )
-    #                 generated_text = response.text.strip()
-    #                 success = True
-    #             except Exception as e:
-    #                 print(f"Error at index {i} (Retry {retries}): {e}")
-    #                 time.sleep(5) # Wait for rate limits
-    #                 retries += 1
+    # 5. Polling Loop
+    if verbose: print(f"Polling status for: {job_name}")
+    while True:
+        status = client.batches.get(name=job_name)
+        state = status.state.name
+        if state == 'JOB_STATE_SUCCEEDED':
+            break
+        elif state in ('JOB_STATE_FAILED', 'JOB_STATE_CANCELLED'):
+            raise Exception(f"Batch job failed. State: {state}. Error: {status.error}")
+        
+        if verbose: print(f"Current State: {state}. Waiting 60s...")
+        time.sleep(60)
+
+    # 6. Download and Save Results
+    ts = get_timestamp()
+    save_dir = output_folder / Path(model_name)
+    save_dir.mkdir(parents=True, exist_ok=True)
+    results_file = save_dir / f"results_{split}_{TP_ABBREVIATIONS[train_plan]}_gemini_{ts}.jsonl"
+
+    if verbose: print(f"Downloading results...")
+    content_bytes = client.files.download_content(name=status.output_file_name)
+    response_lines = content_bytes.decode('utf-8').strip().split('\n')
+
+    with open(results_file, "w") as f:
+        for line in response_lines:
+            res_item = json.loads(line)
+            orig_idx = int(res_item['key'].split('_')[1])
             
-    #         if not success: generated_text = "ERROR_FAILED_GENERATION"
+            try:
+                generated_text = res_item['response']['candidates'][0]['content']['parts'][0]['text'].strip()
+            except (KeyError, IndexError):
+                generated_text = "ERROR_PARSING"
 
-    #         true_label = item.get("completion", "").strip()
-    #         result = {
-    #             "index": i,
-    #             "prediction": generated_text,
-    #             "true_label": true_label,
-    #             "is_correct": generated_text.startswith(true_label),
-    #             "model": model_name
-    #         }
-    #         f.write(json.dumps(result) + "\n")
+            true_label = raw_data[orig_idx].get("completion", "").strip()
             
-    #         if verbose and i % 20 == 0:
-    #             print(f"Processed {i}/{len(raw_data)}...")
-            
-    #         # Free tier safety sleep (adjust based on your tier)
-    #         time.sleep(1.0) 
+            result = {
+                "index": orig_idx,
+                "prediction": generated_text,
+                "true_label": true_label,
+                "is_correct": generated_text.startswith(true_label),
+                "model": model_name
+            }
+            f.write(json.dumps(result) + "\n")
 
-    # print(f"Gemini results saved to: {results_file}")
+    if batch_input_path.exists(): os.remove(batch_input_path)
+    print(f"Gemini results saved to: {results_file}")
 
 def run_inference(engine_params, sampling_params, split, train_plan, input_path, output_folder, chunk_size: int = 2000, lora_path = None, verbose=False):
     if not os.path.exists(input_path):
@@ -192,7 +225,7 @@ def run_inference(engine_params, sampling_params, split, train_plan, input_path,
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fully runs offline inference pipeline.") 
     parser.add_argument("--train_plan", type=str, nargs='?', default='opinion_school', help="Name of training plan to finetune on.")
-    parser.add_argument("--model_name", type=str, nargs='?',  help="Name of model to finetune on.")
+    parser.add_argument("--model_name", type=str, nargs='?',  default=None, help="Name of model to finetune on.")
     parser.add_argument("--run_keyword", type=str, nargs='?', default='aurora', help="Name of inference run")
     parser.add_argument("--adapter_folder", type=str, nargs='?', default=None, help="Folder with safetensor and json.")
     parser.add_argument("--model_type", type=str, choices=['lora', 'base', 'gemini'], default='train')
@@ -257,17 +290,17 @@ if __name__ == "__main__":
     OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
 
     if args.model_type == 'gemini':
-        # run_gemini_inference(
-        #     model_name=args.model_name,
-        #     sampling_params=sampling_config,
-        #     split=inf_split,
-        #     train_plan=args.train_plan,
-        #     input_path=input_path,
-        #     output_folder=OUTPUT_FOLDER,
-        #     verbose=True
-        # )
-        print(f"Gemini mode not implemented yet")
-        pass
+        run_gemini_inference(
+            model_name=args.model_name or "gemini-2.5-flash",
+            sampling_params=sampling_config,
+            split=inf_split,
+            train_plan=args.train_plan,
+            input_path=input_path,
+            output_folder=OUTPUT_FOLDER,
+            verbose=True
+        )
+        # print(f"Gemini mode not implemented yet")
+        # pass
     else:
         run_inference(
             engine_params=engine_config, 

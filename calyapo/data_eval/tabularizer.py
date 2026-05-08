@@ -20,7 +20,9 @@ class Tabularizer:
         self.results_output_path = self.base_report_path / "results"
         
         self.meta_regex = re.compile(
-            r"from the (?P<date>.*?)\s+Berkeley.*?profile:\s*(?P<demogs>.*?)\.\nAnswer.*?about\s+(?P<topic>.*?)\s+according", 
+            r"dataset in (?P<date>\d+).*?"
+            r"Demographics:\s*(?P<demogs>.*?)\n"
+            r"Question\s*\((?P<topic>.*?)\):",
             re.DOTALL | re.IGNORECASE
         )
         self.file_pattern = re.compile(r"(results|config)_(training|train|validation|test)_.*?(lora|base)_(\d{8}_\d{6})\.(jsonl|json)")
@@ -69,6 +71,9 @@ class Tabularizer:
                             entry[k.strip()] = v.strip()
                     rows.append(entry)
         
+        if len(rows) == 0:
+            raise ValueError(f"Loaded {len(rows)} from '{data_path}' with self.meta_regex: {{self.meta_regex}}")
+        
         if self.verbose:
             print(f"Processed {len(rows)} lines from final calyapo dataset: '{data_path}'")
 
@@ -94,6 +99,8 @@ class Tabularizer:
         for file_path in base_path.iterdir():
             match = self.file_pattern.match(file_path.name)
             if match:
+                if verbose:
+                    print(f"Match found for path '{file_path.name}'")
                 file_type, split, model_type, timestamp, file_format = match.groups()
                 if 'train' in split:
                     split_key = 'train' 
@@ -111,6 +118,8 @@ class Tabularizer:
                     found[key] = {}
                 else:
                     found[key][f"{file_type}_path"] = file_path
+            else:
+                print(f"No match for path '{file_path.name}' found using regex pattern: '{self.file_pattern}'. Skipping forward...")
         return found
 
     def run_pipeline(self, model_map: Dict[str, str]):

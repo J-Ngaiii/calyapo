@@ -2,17 +2,18 @@
 # from https://docs-research-it.berkeley.edu/services/high-performance-computing/user-guide/running-your-jobs/scheduler-examples/
 #SBATCH --job-name=calyapo_inference_os 
 #SBATCH --account=fc_hartmanl2
-#SBATCH --partition=savio3_gpu
+#SBATCH --partition=savio4_gpu
 #SBATCH --nodes=1
-#SBATCH --ntasks=2
+#SBATCH --ntasks=1
 
 # Processors per task:
 # Eight times the number for A40 in savio3_gpu
-#SBATCH --cpus-per-task=8
+# Four times the number of GPUs for A500 in savio4_gpu
+#SBATCH --cpus-per-task=4
 
 #Number of GPUs
-#SBATCH --gres=gpu:A40:1
-#SBATCH --qos=a40_gpu3_normal
+#SBATCH --gres=gpu:A5000:1
+#SBATCH --qos=a5k_gpu4_normal
 
 # Wall clock limit:
 #SBATCH --time=10:00:00
@@ -61,9 +62,9 @@ MASTER_PORT=$(expr 10000 + $(echo -n $SLURM_JOBID | tail -c 4)) # Random port to
 
 # Model/Data Params for opinion_school
 TRAIN_PLAN="opinion_school"
-MODEL_NAME="meta-llama/Llama-3.1-8B"
-MODEL_NICKNAME="llama3.1-8b"
-ADAPTER_FOLDER="llama3.1-8b_wd0.1_gam0.85_lr1e-05_2026-04-26-06-20-31PM"
+# MODEL_NAME="meta-llama/Llama-3.1-8B"
+# MODEL_NICKNAME="llama3.1-8b"
+# ADAPTER_FOLDER="llama3.1-8b_wd0.1_gam0.85_lr1e-05_2026-04-26-06-20-31PM"
 
 # MODEL_NAME="meta-llama/Llama-3.1-8B-Instruct"
 # MODEL_NICKNAME="llama3.1-8b-Instruct" 
