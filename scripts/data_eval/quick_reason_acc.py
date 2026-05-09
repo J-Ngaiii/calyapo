@@ -79,7 +79,7 @@ if __name__ == "__main__":
         "meta-llama/Llama-3.2-3B": "results_test_os_lora_20260503_192154",
         "meta-llama/Llama-3.2-3B-Instruct": "results_test_os_lora_20260503_192254", 
         "Qwen/Qwen2.5-14B": "results_test_os_lora_20260503_201244", 
-        "Qwen/Qwen2.5-14B-Instruct": "results_test_os_lora_20260503_201754", 
+        "Qwen/Qwen2.5-14B": "results_test_os_lora_20260503_201754", 
     }
 
     chart_accuracy(

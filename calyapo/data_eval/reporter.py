@@ -3,6 +3,8 @@ import json
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
+import geopandas as gpd
 import seaborn as sns
 from pathlib import Path
 from tqdm import tqdm
@@ -101,6 +103,8 @@ class Reporter:
                 if self.verbose: print(f"( load_tabulars | Reporter) Warning: {spl} split not found at {file_path}")
                 continue
             
+            if self.verbose:
+                print(f"Loading tabulars from path: '{file_path}'")
             df = pd.read_csv(file_path)
             if not weight_lookup.empty:
                 df['weight'] = df['uniqueid'].astype(str).map(weight_lookup).fillna(1.0)
@@ -398,57 +402,126 @@ class Reporter:
 
     # -------------
     # Geo Analysis
-    # -------------
-    def generate_geographic_reports(self, split='test', geo_level='county'):
-    """
-    Wrapper to run both Ground Truth and Synthetic geographic analyses.
-    """
-    for mode in ['ground_truth', 'synthetic']:
-        if self.verbose:
-            print(f"Running {mode} geographic analysis...")
-        self._plot_geo_core(split=split, geo_level=geo_level, mode=mode)
+    # ------------- 
+    def generate_geographic_reports(self, split='test', geo_level='zip', train_setting: int = 1):
+        """
+        Wrapper to run both Ground Truth and Synthetic geographic analyses.
+        """
+        for mode in ['ground_truth', 'synthetic']:
+            if self.verbose:
+                print(f"Running {mode} geographic analysis...")
+            self._plot_geo_core(split=split, geo_level=geo_level, visual_type=mode, setting=train_setting)
 
-def _plot_geo_core(self, split: str, geo_level: str, mode: str):
-    tabs = self.load_tabulars(splits=[split])
-    df = tabs[split]
+    def _geo_level_helper(self, geo_level):
+        counties_map = set(['county', 'counties', 'c', 'cnty'])
+        zips_map = set(['zip', 'zipcode', 'rzip'])
+
+        if geo_level.lower().strip() in counties_map:
+            return 'CNTY'
+        elif geo_level.lower().strip() in zips_map:
+            return 'RZIP'
+        else:
+            raise ValueError(f"Unkown geo_level {geo_level}")
     
-    igs_path = self.root / "calyapo" / "data" / "intermediate" / "igs"
-    geo_df = pd.concat([pd.read_csv(f, usecols=['calyapo_uniqueid', 'COUNTY', 'ZIP'], dtype=str) 
-                        for f in igs_path.glob("*.csv")]).drop_duplicates('calyapo_uniqueid')
-    df = df.merge(geo_df, left_on='uniqueid', right_on='calyapo_uniqueid', how='left')
+    def _plot_geo_core(self, split: str, geo_level: str, visual_type: str, setting: int = 1):
+        tabs = self.load_tabulars(splits=[split]) # loads evaluation_dataset tabulars with weights
+        split_tabular = tabs[split]
+        
+        igs_path = self.root / "calyapo" / "data" / "intermediate" / "igs"
+        geo_level_col_name = self._geo_level_helper(geo_level=geo_level)
+        all_geo_fragments = []
+        for interim_filepath in igs_path.glob("*.csv"):
+            interim_df_cols = pd.read_csv(interim_filepath, nrows=0).columns.tolist()
+            if 'calyapo_uniqueid' in interim_df_cols and geo_level_col_name in interim_df_cols:
+                interim_df_full = pd.read_csv(interim_filepath, usecols=['calyapo_uniqueid', geo_level_col_name], dtype=str)
+                all_geo_fragments.append(interim_df_full)
 
-    shape_path = self.root / "calyapo" / "data" / "eval" / ("CA_Counties.shp" if geo_level == 'county' else "CA_ZCTAs.shp")
-    gdf = gpd.read_file(shape_path)
-    shape_join_col = 'NAME' if geo_level == 'county' else 'ZCTA5CE20'
-    df_geo_col = 'COUNTY' if geo_level == 'county' else 'ZIP'
+        if not all_geo_fragments:
+            print("Error: No RZIP columns found in intermediate IGS files.")
+            return
 
-    candidates = ["Donald Trump", "Joe Biden", "Kamala Harris"]
+        geo_df = pd.concat(all_geo_fragments, ignore_index=True).drop_duplicates('calyapo_uniqueid')
+        geo_df[geo_level_col_name] = geo_df[geo_level_col_name].astype(str).str.split('.').str[0].str.zfill(5) # make sure zip code is 5 digits
+        joined_tabular = split_tabular.merge(geo_df, left_on='uniqueid', right_on='calyapo_uniqueid', how='left') # merge evaluation_dataset tabulars (uses uniqueid) with intermediate IGS data (uses calyapo_uniqueid)
 
-    if mode == 'ground_truth':
-        model_cols = ['true_answer']
-    else:
-        model_cols = [c for c in df.columns if c.endswith('_pred')]
+        shape_path = self.root / "calyapo" / "data" / "eval" / "zip_poly.shp" 
+        gdf = gpd.read_file(shape_path)
+        if self.debug:
+            print(f"gdf columns:\n{gdf.columns}")
+            print(f"gdf first few rows:\n{gdf.head(5)}")
 
-    for col in model_cols:
-        for candidate in candidates:
-            sub_df = df[df['topic'].str.contains(candidate, case=False, na=False)].copy()
-            if sub_df.empty: continue
+        # handling different ways of encoding zip code in shapefiles
+        if 'ZIP_CODE' in gdf.columns:
+            shape_join_col = 'ZIP_CODE'
+        elif 'ZCTA5CE20' in gdf.columns:
+            shape_join_col = 'ZCTA5CE20'
+        elif 'ZCTA5' in gdf.columns:
+            shape_join_col = 'ZCTA5'
+        else:
+            raise ValueError(f"Could not find a valid ZIP column in shapefile. Columns: {gdf.columns}") 
+        
+        gdf[shape_join_col] = gdf[shape_join_col].astype(str).str.zfill(5)
 
-            # calculate proportion of Choice A (Strongly Favorable)
-            stats = sub_df.groupby(df_geo_col)[col].apply(
-                lambda x: (x.astype(str).str.contains('A', na=False)).mean()
-            ).reset_index(name='prop')
+        if setting == 1: # hardcode for now
+            survey_questions = ["Donald Trump", "Joe Biden", "Kamala Harris"]
+            setting_label = "Favorability Towards Presidential Candidates"
+            cmap = LinearSegmentedColormap.from_list("politics", ["#c91616", "#ebe701", "#00bc29"]) # red, purple and blue for politics
+        else:
+            survey_questions = ["Defending Abortion Rights"]
+            setting_label = "Abortion_Access"
+            cmap = LinearSegmentedColormap.from_list("opinion", ["#C21414", "#2483d1"]) # it just needs to be a dark color
+        
+        if visual_type == 'ground_truth':
+            tabular_ground_truth_cols = ['true_answer']
+            target_cols = tabular_ground_truth_cols
+        elif visual_type == 'synthetic':
+            tabular_LLM_model_cols = [c for c in joined_tabular.columns if c.endswith('_pred')]
+            target_cols = tabular_LLM_model_cols
+        for col in tqdm(target_cols, desc=f"Mapping {visual_type} via {geo_level_col_name}"):
+            for targ_question in survey_questions:
+                if 'topic' not in joined_tabular.columns:
+                    raise ValueError(f"No 'topic' column detected in tabular df for inputted split '{split}'. Inputted tabular only has columns: {split_tabular.columns}")
+                sub_df = joined_tabular[joined_tabular['topic'].str.contains(targ_question, case=False, na=False)].copy()
+                # if self.debug:
+                #     print(f"Sub df cols: {sub_df.columns}")
+                if sub_df.empty: 
+                    if self.verbose:
+                        print(f"Did not find survey question '{targ_question}' under 'topic' col in tabular for split: '{split}'. Only had the following topics: {split_tabular['topic'].unique()}")
+                    continue
+                # col is either a 'true_answer' col or "_pred" cols that come from tabulars
+                sentiment_map = {'A': 1.0, 'B': 0.66, 'C': 0.33, 'D': 0.0}
+                sub_df['harmonized_score'] = sub_df[col].map(sentiment_map)
+                # geo_level_col_name comes from IGS intermediate and joining with IGS intermediate
+                stats = sub_df.groupby(geo_level_col_name).apply( 
+                    lambda x: (x['harmonized_score'] * x['weight']).sum() / x['weight'].sum() # sum up weights then divide, multiplying by indicator to toggle
+                ).reset_index(name='prop')
+                
+                stats[geo_level_col_name] = stats[geo_level_col_name].astype(str).str.zfill(5)
+                merged = gdf.merge(stats, left_on=shape_join_col, right_on=geo_level_col_name, how='left') # keep gdf col's zip col --> so every single zip code has a row
+                fig, ax = plt.subplots(1, 1, figsize=(12, 12))
+                gdf.plot(ax=ax, color='#eeeeee', edgecolor='#bcbcbc', linewidth=0.1) # make sure areas with no data stay greyed, make sure to plot onto the same axes
+                valid_zips_groupby = merged.dropna(subset=['prop']) # drop rows corresponding to zip codes for which there was no value found from the join
+                
+                if self.debug:
+                    num_zips_with_data = len(valid_zips_groupby) / len(merged)
+                    print(f"Spatial coverage for {targ_question}: {num_zips_with_data:.2%}")
 
-            merged = gdf.merge(stats, left_on=shape_join_col, right_on=df_geo_col, how='left')
-            
-            fig, ax = plt.subplots(1, 1, figsize=(10, 12))
-            merged.plot(column='prop', cmap='RdYlBu_r', legend=True, ax=ax, missing_kwds={'color': 'lightgrey'})
-            
-            title = f"{mode.upper()}: {candidate}\nSource: {col}"
-            ax.set_title(title, fontsize=14)
-            ax.axis('off')
-
-            out_dir = self.results_folder / "maps" / split / mode
-            out_dir.mkdir(parents=True, exist_ok=True)
-            plt.savefig(out_dir / f"{candidate.replace(' ', '_')}_{col}_map.png", dpi=300)
-            plt.close()
+                valid_zips_groupby.plot( # plot onto the sane axes
+                    column='prop', 
+                    cmap=cmap, 
+                    legend=True, 
+                    ax=ax, 
+                    edgecolor='none', 
+                    vmin=0, # fix axis
+                    vmax=1
+                )
+                
+                ax.set_title(f"{visual_type.upper()} {setting_label}: {targ_question}\n{geo_level_col_name} Weighted Opinion Towards {targ_question}", fontsize=14)
+                ax.axis('off')
+                out_dir = self.results_folder / "maps" / split / f"setting_{setting}" / visual_type
+                out_dir.mkdir(parents=True, exist_ok=True)
+                out_path = out_dir / f"{targ_question.replace(' ', '_')}_{col}_zip_map.png"
+                plt.savefig(out_path, dpi=900, bbox_inches='tight')
+                if self.debug:
+                    print(f"Saved to: {out_path}")
+                plt.close(fig)
