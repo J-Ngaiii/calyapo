@@ -38,6 +38,7 @@ def flatten_data_to_llama_format(raw_data_list: List[Dict], split: str) -> List[
         narrative_first_person_time_and_poll = f"You are a survey respondent based in California from the {polling_date} {polling_firm} polling wave."
         narrative_classic = f"This is a respondent from the {dataset_label} dataset in {time_label}."
         narrative_simple = f"This is a respondent."
+
         demog_prelude_first_person = f"You have the following demographic profile"
         demog_prelude_simple = f"Demographics"
         
@@ -75,7 +76,7 @@ def flatten_data_to_llama_format(raw_data_list: List[Dict], split: str) -> List[
 
             # construct prompt
             prompt = (
-                f"{narrative_classic}\n"
+                f"{narrative_simple}\n"
                 f"{demog_prelude_simple}: {demog_str}.\n"
                 f"{question_prelude_simple}: {question_text}\n"
                 f"{choices_block}\n"

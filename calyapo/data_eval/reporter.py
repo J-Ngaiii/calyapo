@@ -506,7 +506,7 @@ class Reporter:
                     num_zips_with_data = len(valid_zips_groupby) / len(merged)
                     print(f"Spatial coverage for {targ_question}: {num_zips_with_data:.2%}")
 
-                valid_zips_groupby.plot( # plot onto the sane axes
+                valid_zips_groupby.plot( # plot onto the same axes
                     column='prop', 
                     cmap=cmap, 
                     legend=True, 
@@ -520,8 +520,11 @@ class Reporter:
                 ax.axis('off')
                 out_dir = self.results_folder / "maps" / split / f"setting_{setting}" / visual_type
                 out_dir.mkdir(parents=True, exist_ok=True)
-                out_path = out_dir / f"{targ_question.replace(' ', '_')}_{col}_zip_map.png"
-                plt.savefig(out_path, dpi=900, bbox_inches='tight')
+                out_path_png = out_dir / f"{targ_question.replace(' ', '_')}_{col}_zip_map.png"
+                # out_path_csv = out_dir / f"{targ_question.replace(' ', '_')}_{col}_zip_df.csv"
+                plt.savefig(out_path_png, dpi=900, bbox_inches='tight')
+                # merged.to_csv(out_path_csv)
                 if self.debug:
-                    print(f"Saved to: {out_path}")
+                    print(f"Saved png to: {out_path_png}")
+                    # print(f"Saved csv to: {out_path_csv}")
                 plt.close(fig)

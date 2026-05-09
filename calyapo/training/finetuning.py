@@ -432,6 +432,7 @@ def main(**kwargs):
     )
     if not train_config.enable_fsdp or rank == 0:
         print(f"--> Training Set Length = {len(dataset_train)}")
+        print(f"--> Training Set Path = {dataset_config.train_split}")
 
     dataset_val = get_preprocessed_dataset(
         dataset_processer,
@@ -440,6 +441,7 @@ def main(**kwargs):
     )
     if not train_config.enable_fsdp or rank == 0:
         print(f"--> Validation Set Length = {len(dataset_val)}")
+        print(f"--> Training Set Path = {dataset_config.test_split}")
 
     if train_config.batching_strategy == "packing":
         if is_vision:
