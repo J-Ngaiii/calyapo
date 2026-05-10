@@ -1,5 +1,6 @@
 import json
 import re
+import ast
 import pandas as pd
 from pathlib import Path
 from typing import List, Dict, Union
@@ -20,7 +21,9 @@ class Tabularizer:
         self.results_output_path = self.base_report_path / "results"
         
         self.meta_regex = re.compile(
-            r"from the (?P<date>.*?)\s+Berkeley.*?profile:\s*(?P<demogs>.*?)\.\nAnswer.*?about\s+(?P<topic>.*?)\s+according", 
+            r"dataset in (?P<date>\d+).*?"
+            r"Demographics:\s*(?P<demogs>.*?)\n"
+            r"Question\s*\((?P<topic>.*?)\):",
             re.DOTALL | re.IGNORECASE
         )
         self.file_pattern = re.compile(r"(results|config)_(training|train|validation|test)_.*?(lora|base)_(\d{8}_\d{6})\.(jsonl|json)")
@@ -69,6 +72,9 @@ class Tabularizer:
                             entry[k.strip()] = v.strip()
                     rows.append(entry)
         
+        if len(rows) == 0:
+            raise ValueError(f"Loaded {len(rows)} from '{data_path}' with self.meta_regex: {{self.meta_regex}}")
+        
         if self.verbose:
             print(f"Processed {len(rows)} lines from final calyapo dataset: '{data_path}'")
 
@@ -84,6 +90,7 @@ class Tabularizer:
     def get_inference_files(self, model_subfolder: Path,) -> Dict:
         """
         Locates results and config file paths for a specific model.
+        Looks through all files in designated directory and checks if it fulfills the regex pattern
         """
         base_path = self.root / "inference_outputs" / self.train_plan / model_subfolder
         found = {}
@@ -94,6 +101,8 @@ class Tabularizer:
         for file_path in base_path.iterdir():
             match = self.file_pattern.match(file_path.name)
             if match:
+                if self.verbose:
+                    print(f"Match found for path '{file_path.name}'")
                 file_type, split, model_type, timestamp, file_format = match.groups()
                 if 'train' in split:
                     split_key = 'train' 
@@ -111,9 +120,41 @@ class Tabularizer:
                     found[key] = {}
                 else:
                     found[key][f"{file_type}_path"] = file_path
+            else:
+                print(f"Path '{file_path}' does not match regex pattern: '{self.file_pattern}'. Skipping forward...")
         return found
+    
+    # def _parse_logprobs_string(self, lp_str: str) -> tuple:
+    #     """
+    #     Parses the pseudo-Python Logprob string by converting it to valid JSON.
+    #     """
+    #     try:
+    #         if not lp_str or not isinstance(lp_str, str):
+    #             return None, None
+            
+    #         cleaned = lp_str.replace("Logprob(", "{").replace(")", "}")
+    #         cleaned = cleaned.replace("=", ":")
+    #         cleaned = re.sub(r"([a-zA-Z_]+):", r'"\1":', cleaned)
+    #         cleaned = cleaned.replace("'", '"')
+    #         lp_data = json.loads(cleaned)
+            
+    #         if not isinstance(lp_data, list) or len(lp_data) == 0:
+    #             return None, None
+                
+    #         first_token_options = lp_data[0]
+    #         sorted_options = sorted(first_token_options.values(), key=lambda x: x.get('rank', 99))
+    #         lp1 = sorted_options[0].get('logprob') if len(sorted_options) >= 1 else None
+    #         lp2 = sorted_options[1].get('logprob') if len(sorted_options) >= 2 else None
+            
+    #         return lp1, lp2
+    #     except Exception as e:
+    #         print(f"Error parsing logprobs: {e}")
+    #         return None, None
 
     def run_pipeline(self, model_map: Dict[str, str]):
+        """
+        Whereas self.parse_base_calyapo_data() parses the intermediate calyapo datasets, this function is where we load and parse inference outputs. 
+        """
         
         self.setup_directories()
 
@@ -157,9 +198,18 @@ class Tabularizer:
                 
                 col_pred = f"{model_nickname}_{model_type}_pred"
                 col_corr = f"{model_nickname}_{model_type}_correct"
+                # col_lp1 = f"{model_nickname}_{model_type}_lp1"
+                # col_lp2 = f"{model_nickname}_{model_type}_lp2"
                 
                 df_calyapo[col_pred] = df_inf['prediction'].values
                 df_calyapo[col_corr] = df_inf['is_correct'].values
+
+                # if 'logprobs' in df_inf.columns:
+                #     if self.verbose: 
+                #         print(f"Extracting logprobs for {model_nickname} {model_type}...")
+                #     parsed = df_inf['logprobs'].apply(self._parse_logprobs_string)
+                #     df_calyapo[col_lp1] = [x[0] for x in parsed]
+                #     df_calyapo[col_lp2] = [x[1] for x in parsed]
 
         for split, df in combined_dataframes.items():
             if not df.empty:

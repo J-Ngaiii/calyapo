@@ -25,7 +25,7 @@ def flatten_data_to_llama_format(raw_data_list: List[Dict], split: str) -> List[
     Flattens Individuals into MCQ Prompt/Completion pairs.
     """
     flattened_examples = []
-    
+    meta_configs = []
     for entry in raw_data_list:
         # 1. Base Context
         time_period = entry.get('time', 'Unknown')
@@ -82,8 +82,15 @@ def flatten_data_to_llama_format(raw_data_list: List[Dict], split: str) -> List[
                 "prompt": prompt,
                 "completion": completion
             })
-            
-    return flattened_examples
+
+            meta_configs.append({
+                'id': entry.get('id', 'Unknown'), 
+                'uniqueid': entry.get('uniqueid', 'Unknown'), 
+                'time_period': entry.get('time', 'Unknown'), 
+                'dataset': entry.get('dataset', 'Unknown'), 
+            })
+
+    return flattened_examples, meta_configs
 
 def save_jsonl(data: List[Dict], filename: str, out_path: str = None, verbose: bool = False):
     if out_path is None:
@@ -102,9 +109,16 @@ def split_combine(
         debug: bool = False, 
         verbose: bool = True
     ):
-    train_data = []
-    val_data = []
-    test_data = []
+    data_dict = {
+        'train' : [], 
+        'val' : [], 
+        'test' : []
+    }
+    meta_dict = {
+        'train' : [], 
+        'val' : [], 
+        'test' : []
+    }
         
     # needs to be able to take different packages in memory
     if verbose:
@@ -114,22 +128,22 @@ def split_combine(
         if debug:
             print(f"(split_combine | Debug) Data Package: {package}")
 
-        train_indiv_maps: List[Dict] = inpack.get('train')
-        val_indiv_maps: List[Dict] = inpack.get('val')
-        test_indiv_maps: List[Dict] = inpack.get('test')
-        train_data.extend(flatten_data_to_llama_format(train_indiv_maps, 'train'))
-        val_data.extend(flatten_data_to_llama_format(val_indiv_maps, 'val'))
-        test_data.extend(flatten_data_to_llama_format(test_indiv_maps, 'test'))
+        for split in ['train', 'val', 'test']:
+            if verbose:
+                print(f"(split_combine) Processings split {split}...")
+            indiv_map: List[Dict] = inpack.get(split)
+            data, meta = flatten_data_to_llama_format(indiv_map, split)
+            data_dict[split].extend(data)
+            meta_dict[split].extend(data)
 
-    if save:
-        assert out_path is not None, f"(split_combine | WARNING) Cannot have no out_path if saving."
-        save_jsonl(train_data, f"{package.train_plan}_train.jsonl", out_path, verbose)
-        save_jsonl(val_data, f"{package.train_plan}_val.jsonl", out_path, verbose)
-        save_jsonl(test_data, f"{package.train_plan}_test.jsonl", out_path, verbose)
+            if save:
+                assert out_path is not None, f"(split_combine | WARNING) Cannot have no out_path if saving."
+                save_jsonl(data_dict[split], f"{package.train_plan}_{split}.jsonl", out_path, verbose)
+                save_jsonl(meta_dict[split], f"{package.train_plan}_{split}_meta.jsonl", out_path, verbose)
 
     return {
-        "train": train_data,
-        "val": val_data,
-        "test": test_data
+        "train": data_dict['train'],
+        "val": data_dict['val'],
+        "test": data_dict['test']
     }
 

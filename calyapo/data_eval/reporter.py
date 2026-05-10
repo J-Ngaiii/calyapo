@@ -3,6 +3,8 @@ import json
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
+import geopandas as gpd
 import seaborn as sns
 from pathlib import Path
 from tqdm import tqdm
@@ -101,6 +103,8 @@ class Reporter:
                 if self.verbose: print(f"( load_tabulars | Reporter) Warning: {spl} split not found at {file_path}")
                 continue
             
+            if self.verbose:
+                print(f"Loading tabulars from path: '{file_path}'")
             df = pd.read_csv(file_path)
             if not weight_lookup.empty:
                 df['weight'] = df['uniqueid'].astype(str).map(weight_lookup).fillna(1.0)
@@ -159,8 +163,6 @@ class Reporter:
                 
                 for container in ax.containers:
                     ax.bar_label(container, fmt='%.3f', padding=3)
-                if i != 0:
-                    ax.get_legend().remove()
 
             plt.tight_layout()
             
@@ -197,6 +199,53 @@ class Reporter:
     # ----------------------------
     # Crosstab Generation
     # ----------------------------
+    def save_as_latex(self, master_df: pd.DataFrame, topic: str, demog: str, model_nickname: str, split: str):
+        true_cols = [c for c in master_df.columns if c.startswith('weighted_true_')]
+        choices = [c.replace('weighted_true_', '') for c in true_cols]
+        
+        true_df_part = master_df[[demog] + true_cols].set_index(demog)
+        
+        model_prefix = f"weighted_model_{model_nickname}_lora_"
+        
+        model_data_dict = {}
+        for c in choices:
+            col_name = f"{model_prefix}{c}"
+            if col_name in master_df.columns:
+                model_data_dict[c] = master_df[col_name].values
+            else:
+                model_data_dict[c] = 0.0
+                
+        model_df_part = pd.DataFrame(model_data_dict, index=master_df[demog])
+
+        header_true = [('True Proportions (%)', c) for c in choices]
+        header_model = [(f'{model_nickname} Predicted (%)', c) for c in choices]
+        
+        combined_df = pd.concat([true_df_part, model_df_part], axis=1)
+        combined_df.columns = pd.MultiIndex.from_tuples(header_true + header_model)
+
+        col_layout = 'l|' + 'c'*len(choices) + '|' + 'c'*len(choices)
+        caption = f"Weighted Proportions vs. {model_nickname} (LoRA) on {topic} (By {demog})"
+        
+        latex_str = combined_df.style.to_latex(
+            column_format=col_layout,
+            caption=caption,
+            label=f"tab:{topic}_{demog}_{model_nickname}".replace(" ", "_"),
+            position='h!',
+            hrules=True,
+            position_float="centering"
+        )
+
+        out_dir = self.results_folder / "latex_tables" / split / topic.replace(" ", "_")
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / f"by_{demog}_{model_nickname}.tex"
+        
+        with open(out_path, 'w') as f:
+            f.write("\\begin{table}[h!]\n\\centering\n\\small\n")
+            f.write(latex_str)
+            f.write("\\end{table}")
+
+        if self.debug: print(f"LaTeX table saved to: {out_path}")
+
     def _get_weighted_crosstab(self, df, group_col, target_col, weight_col='weight'):
         """
         Helper to calculate weighted proportions manually.
@@ -277,6 +326,15 @@ class Reporter:
                     master_ct = pd.concat(all_cts, axis=1).round(2).reset_index()
                     save_path = crosstab_out / split / topic_label / f"by_{demog}_comparison.csv"
                     file_saver(out_path=save_path, data=master_ct, data_type='csv', verbose=self.verbose)
+
+                    for model in self.model_names:
+                        self.save_as_latex(
+                            master_df=master_ct, 
+                            topic=topic_var, 
+                            demog=demog, 
+                            model_nickname=model,
+                            split=split
+                        )
 
     # ----------------------------
     # Distributional Accuracy (KL/WD)
@@ -395,3 +453,132 @@ class Reporter:
         
         if self.verbose: 
             print(f"( distributional_accuracy | Reporter) Success: Weighted and Unweighted metrics saved to {out_path}")
+
+    # -------------
+    # Geo Analysis
+    # ------------- 
+    def generate_geographic_reports(self, split='test', geo_level='zip', train_setting: int = 1):
+        """
+        Wrapper to run both Ground Truth and Synthetic geographic analyses.
+        """
+        for mode in ['ground_truth', 'synthetic']:
+            if self.verbose:
+                print(f"Running {mode} geographic analysis...")
+            self._plot_geo_core(split=split, geo_level=geo_level, visual_type=mode, setting=train_setting)
+
+    def _geo_level_helper(self, geo_level):
+        counties_map = set(['county', 'counties', 'c', 'cnty'])
+        zips_map = set(['zip', 'zipcode', 'rzip'])
+
+        if geo_level.lower().strip() in counties_map:
+            return 'CNTY'
+        elif geo_level.lower().strip() in zips_map:
+            return 'RZIP'
+        else:
+            raise ValueError(f"Unkown geo_level {geo_level}")
+    
+    def _plot_geo_core(self, split: str, geo_level: str, visual_type: str, setting: int = 1):
+        tabs = self.load_tabulars(splits=[split]) # loads evaluation_dataset tabulars with weights
+        split_tabular = tabs[split]
+        
+        igs_path = self.root / "calyapo" / "data" / "intermediate" / "igs"
+        geo_level_col_name = self._geo_level_helper(geo_level=geo_level)
+        all_geo_fragments = []
+        for interim_filepath in igs_path.glob("*.csv"):
+            interim_df_cols = pd.read_csv(interim_filepath, nrows=0).columns.tolist()
+            if 'calyapo_uniqueid' in interim_df_cols and geo_level_col_name in interim_df_cols:
+                interim_df_full = pd.read_csv(interim_filepath, usecols=['calyapo_uniqueid', geo_level_col_name], dtype=str)
+                all_geo_fragments.append(interim_df_full)
+
+        if not all_geo_fragments:
+            print("Error: No RZIP columns found in intermediate IGS files.")
+            return
+
+        geo_df = pd.concat(all_geo_fragments, ignore_index=True).drop_duplicates('calyapo_uniqueid')
+        geo_df[geo_level_col_name] = geo_df[geo_level_col_name].astype(str).str.split('.').str[0].str.zfill(5) # make sure zip code is 5 digits
+        joined_tabular = split_tabular.merge(geo_df, left_on='uniqueid', right_on='calyapo_uniqueid', how='left') # merge evaluation_dataset tabulars (uses uniqueid) with intermediate IGS data (uses calyapo_uniqueid)
+
+        shape_path = self.root / "calyapo" / "data" / "eval" / "zip_poly.shp" 
+        gdf = gpd.read_file(shape_path)
+        if self.debug:
+            print(f"gdf columns:\n{gdf.columns}")
+            print(f"gdf first few rows:\n{gdf.head(5)}")
+
+        # handling different ways of encoding zip code in shapefiles
+        if 'ZIP_CODE' in gdf.columns:
+            shape_join_col = 'ZIP_CODE'
+        elif 'ZCTA5CE20' in gdf.columns:
+            shape_join_col = 'ZCTA5CE20'
+        elif 'ZCTA5' in gdf.columns:
+            shape_join_col = 'ZCTA5'
+        else:
+            raise ValueError(f"Could not find a valid ZIP column in shapefile. Columns: {gdf.columns}") 
+        
+        gdf[shape_join_col] = gdf[shape_join_col].astype(str).str.zfill(5)
+
+        if setting == 1: # hardcode for now
+            survey_questions = ["Donald Trump", "Joe Biden", "Kamala Harris"]
+            setting_label = "Favorability Towards Presidential Candidates"
+            cmap = LinearSegmentedColormap.from_list("politics", ["#c91616", "#ebe701", "#00bc29"]) # red, purple and blue for politics
+        else:
+            survey_questions = ["Defending Abortion Rights"]
+            setting_label = "Abortion_Access"
+            cmap = LinearSegmentedColormap.from_list("opinion", ["#C21414", "#2483d1"]) # it just needs to be a dark color
+        
+        if visual_type == 'ground_truth':
+            tabular_ground_truth_cols = ['true_answer']
+            target_cols = tabular_ground_truth_cols
+        elif visual_type == 'synthetic':
+            tabular_LLM_model_cols = [c for c in joined_tabular.columns if c.endswith('_pred')]
+            target_cols = tabular_LLM_model_cols
+        for col in tqdm(target_cols, desc=f"Mapping {visual_type} via {geo_level_col_name}"):
+            for targ_question in survey_questions:
+                if 'topic' not in joined_tabular.columns:
+                    raise ValueError(f"No 'topic' column detected in tabular df for inputted split '{split}'. Inputted tabular only has columns: {split_tabular.columns}")
+                sub_df = joined_tabular[joined_tabular['topic'].str.contains(targ_question, case=False, na=False)].copy()
+                # if self.debug:
+                #     print(f"Sub df cols: {sub_df.columns}")
+                if sub_df.empty: 
+                    if self.verbose:
+                        print(f"Did not find survey question '{targ_question}' under 'topic' col in tabular for split: '{split}'. Only had the following topics: {split_tabular['topic'].unique()}")
+                    continue
+                # col is either a 'true_answer' col or "_pred" cols that come from tabulars
+                sentiment_map = {'A': 1.0, 'B': 0.66, 'C': 0.33, 'D': 0.0}
+                sub_df['harmonized_score'] = sub_df[col].map(sentiment_map)
+                # geo_level_col_name comes from IGS intermediate and joining with IGS intermediate
+                stats = sub_df.groupby(geo_level_col_name).apply( 
+                    lambda x: (x['harmonized_score'] * x['weight']).sum() / x['weight'].sum() # sum up weights then divide, multiplying by indicator to toggle
+                ).reset_index(name='prop')
+                
+                stats[geo_level_col_name] = stats[geo_level_col_name].astype(str).str.zfill(5)
+                merged = gdf.merge(stats, left_on=shape_join_col, right_on=geo_level_col_name, how='left') # keep gdf col's zip col --> so every single zip code has a row
+                fig, ax = plt.subplots(1, 1, figsize=(12, 12))
+                gdf.plot(ax=ax, color='#eeeeee', edgecolor='#bcbcbc', linewidth=0.1) # make sure areas with no data stay greyed, make sure to plot onto the same axes
+                valid_zips_groupby = merged.dropna(subset=['prop']) # drop rows corresponding to zip codes for which there was no value found from the join
+                
+                if self.debug:
+                    num_zips_with_data = len(valid_zips_groupby) / len(merged)
+                    print(f"Spatial coverage for {targ_question}: {num_zips_with_data:.2%}")
+
+                valid_zips_groupby.plot( # plot onto the same axes
+                    column='prop', 
+                    cmap=cmap, 
+                    legend=True, 
+                    ax=ax, 
+                    edgecolor='none', 
+                    vmin=0, # fix axis
+                    vmax=1
+                )
+                
+                ax.set_title(f"{visual_type.upper()} {setting_label}: {targ_question}\n{geo_level_col_name} Weighted Opinion Towards {targ_question}", fontsize=14)
+                ax.axis('off')
+                out_dir = self.results_folder / "maps" / split / f"setting_{setting}" / visual_type
+                out_dir.mkdir(parents=True, exist_ok=True)
+                out_path_png = out_dir / f"{targ_question.replace(' ', '_')}_{col}_zip_map.png"
+                # out_path_csv = out_dir / f"{targ_question.replace(' ', '_')}_{col}_zip_df.csv"
+                plt.savefig(out_path_png, dpi=900, bbox_inches='tight')
+                # merged.to_csv(out_path_csv)
+                if self.debug:
+                    print(f"Saved png to: {out_path_png}")
+                    # print(f"Saved csv to: {out_path_csv}")
+                plt.close(fig)
