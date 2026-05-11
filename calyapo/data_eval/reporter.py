@@ -3,7 +3,9 @@ import json
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
 from matplotlib.colors import LinearSegmentedColormap
+import matplotlib.cm as cm
 import geopandas as gpd
 import seaborn as sns
 from pathlib import Path
@@ -24,6 +26,7 @@ class Reporter:
         self.base_report_path = self.root / "inference_outputs" / train_plan / f"reports_{run_keyword}"
         self.tabular_folder_path = self.base_report_path / "evaluation_datasets"
         self.results_folder = self.base_report_path / "results"
+        self.graphs_folder = self.results_folder / "graphs"
         
         config_path = self.base_report_path / 'report_meta_config.json'
         if not config_path.exists():
@@ -122,6 +125,21 @@ class Reporter:
     # ----------------------------
     # Model Accuracy Reporting
     # ----------------------------
+    def _calculate_weighted_accuracy(self, df: pd.DataFrame, correct_col: str, weight_col: str = 'weight') -> float:
+        """
+        Calculates the weighted mean of the 'correct' column.
+        """
+        if df.empty:
+            return 0.0
+        
+        weights = df[weight_col].fillna(1.0)
+        correct = df[correct_col].fillna(0).astype(int)
+        
+        weighted_sum = (correct * weights).sum()
+        total_weight = weights.sum()
+        
+        return weighted_sum / total_weight if total_weight > 0 else 0.0
+    
     def _helper_acc_df(self, tabulars_dict: Dict[str, pd.DataFrame]) -> pd.DataFrame:
         report_list = []
         for split, df in tabulars_dict.items():
@@ -129,19 +147,21 @@ class Reporter:
                 for m_type in ['base', 'lora']:
                     col = f"{model}_{m_type}_correct"
                     if col in df.columns:
+                        w_acc = self._calculate_weighted_accuracy(df, col, 'weight')
                         report_list.append({
                             'Model_Name': model,
                             'Split': split.capitalize(),
                             'Type': m_type.upper(),
-                            'Accuracy': df[col].mean()
+                            'Accuracy': df[col].mean(), 
+                            'Weighted Accuracy': w_acc
                         })
                     else:
                         if self.verbose: 
                             print(f"Warning could not find column {col}")
         # creates up to 24 entries (4 llama models base and lora versions each getting an entry for each of the three splits)
         return pd.DataFrame(report_list)
-
-    def _acc_plot(self, df: pd.DataFrame, save_filename: str = None, show: bool = False):
+    
+    def _acc_plot(self, df: pd.DataFrame, acc_col_name: str = 'Accuracy', save_filename: str = None, show: bool = False):
             sns.set_style("whitegrid")
             palette = {"LORA": "orange", "BASE": "dodgerblue"}
             
@@ -158,7 +178,7 @@ class Reporter:
                 sns.barplot(data=model_df, x="Split", y="Accuracy", hue="Type", 
                             palette=palette, ax=ax, alpha=0.8)
                 
-                ax.set_title(f"Performance: {model}")
+                ax.set_title(f"{acc_col_name} Performance: {model}")
                 ax.set_ylim(0, 1.0) # accuracy is 0-1
                 
                 for container in ax.containers:
@@ -174,7 +194,10 @@ class Reporter:
                 plt.savefig(save_path, dpi=300, bbox_inches='tight')
                 if self.verbose: print(f"Plot saved to: {save_path}")
             
-            if show: plt.show()
+            if show: 
+                plt.show()
+
+            plt.close()
 
     def accuracy(self, show_plots = False):
         """
@@ -191,8 +214,10 @@ class Reporter:
         report_df = self._helper_acc_df(tabulars)
         
         if not report_df.empty:
-            save_name = f"{self.train_plan}_accuracy_comparison.png"
-            self._acc_plot(report_df, save_filename=save_name, show=show_plots)
+            acc_name = f"{self.train_plan}_accuracy_comparison.png"
+            weighted_acc_name = f"{self.train_plan}_weighted_accuracy_comparison.png"
+            self._acc_plot(report_df, acc_col_name='Accuracy', save_filename=acc_name, show=show_plots)
+            self._acc_plot(report_df, acc_col_name='Weighted Accuracy', save_filename=weighted_acc_name, show=show_plots)
             # also save the raw numbers
             report_df.to_csv(self.results_folder / "accuracy_metrics.csv", index=False)
         else:
@@ -528,3 +553,608 @@ class Reporter:
                     print(f"Saved png to: {out_path_png}")
                     # print(f"Saved csv to: {out_path_csv}")
                 plt.close(fig)
+    # -------------
+    # Conf Analysis
+    # -------------
+   
+    def _collect_confidence_df(self, tabulars_dict: Dict[str, pd.DataFrame]) -> pd.DataFrame:
+        """
+        Creates a copy of the tabulars but cleaned out
+        """
+        rows = []
+
+
+        for split, df in tabulars_dict.items():
+
+
+            for model in self.model_names:
+
+
+                for m_type in ["base", "lora"]:
+
+
+                    prefix = f"{model}_{m_type}"
+
+
+                    top_lp = f"{prefix}_top_logprob"
+                    top2 = f"{prefix}_top2_diff"
+                    top5 = f"{prefix}_top5_sd"
+                    correct = f"{prefix}_correct"
+
+
+                    if top_lp not in df.columns:
+                        continue
+
+
+                    tmp = pd.DataFrame({
+                        "Split": split,
+                        "Model": model,
+                        "Type": m_type.upper(),
+                        "TopLogProb": df[top_lp],
+                        "Top2Diff": df[top2] if top2 in df.columns else None,
+                        "Top5SD": df[top5] if top5 in df.columns else None,
+                        "Correct": df[correct] if correct in df.columns else None
+                    })
+
+
+                    rows.append(tmp)
+
+
+        return pd.concat(rows, ignore_index=True)
+   
+    def _confidence_plot(
+        self,
+        df: pd.DataFrame,
+        split: str,
+        save_filename: str = None,
+        show: bool = False,
+        plot_top_logprob: bool = True,
+        plot_top2_diff: bool = False,
+        plot_top5_sd: bool = False,
+    ):
+        df = df[df['Split'] == split].copy()
+       
+        sns.set_style("whitegrid")
+        plot_configs = []
+
+
+        if plot_top_logprob:
+            plot_configs.append(("TopLogProb", "Top Token Log-Probability (Confidence)"))
+        if plot_top2_diff:
+            plot_configs.append(("Top2Diff", "Top-2 Logprob Gap (Decision Margin)"))
+        if plot_top5_sd:
+            plot_configs.append(("Top5SD", "Top-5 Logprob Std Dev (Uncertainty Spread)"))
+
+
+        n = len(plot_configs)
+
+
+        if n == 0:
+            raise ValueError("No plots selected for confidence visualization.")
+
+
+        fig, axes = plt.subplots(1, n, figsize=(6 * n, 5))
+
+
+        if n == 1:
+            axes = [axes]
+
+
+        for ax, (col, title) in zip(axes, plot_configs):
+
+
+            sns.boxplot(
+                data=df,
+                x="Model",
+                y=col,
+                hue="Type",
+                ax=ax,
+                showfliers=False  # remove outliers
+            )
+
+
+            ax.set_title(title)
+
+
+            # rotate + shrink x-labels
+            ax.set_xticklabels(
+                ax.get_xticklabels(),
+                rotation=30,
+                ha="right",
+                fontsize=9
+            )
+
+
+            # shrink y tick labels slightly too
+            ax.tick_params(axis='y', labelsize=9)
+
+
+        plt.tight_layout()
+
+
+        if save_filename:
+            folder_path = Path(f"{self.graphs_folder}/{split}")
+            folder_path.mkdir(parents=True, exist_ok=True)
+            save_path = folder_path / save_filename
+            plt.savefig(save_path, dpi=300, bbox_inches="tight")
+
+
+        if show:
+            plt.show()
+
+
+    def _confidence_vs_accuracy(self, df: pd.DataFrame, split: str, save_filename: str = None, show: bool = False):
+        """
+        Works by first binning confidence tabulars by Confidence values (which is just the probability the model had for the top token it selected),
+        then calculating average confidence per bin and model accuracy per bin.
+        """
+       
+        df = df[df['Split'] == split].dropna(subset=["TopLogProb", "Correct"]).copy()
+        df["Confidence"] = np.exp(df["TopLogProb"])
+        df["FullPrefix"] = df["Model"] + "_" + df["Type"]
+        prefixes = df["FullPrefix"].unique()
+
+
+        plt.figure(figsize=(7, 6))
+        for prefix in prefixes:
+            sub = df[df["FullPrefix"] == prefix].copy()
+            if len(sub) == 0:
+                if self.debug:
+                    print(f"(_confidence_vs_accuracy) No sub df detected in")
+                continue
+            sub["ConfBin"] = pd.cut(sub["Confidence"], bins=10)
+            grouped = sub.groupby("ConfBin").agg(
+                accuracy=("Correct", "mean"),
+                confidence=("Confidence", "mean")
+            ).reset_index()
+
+
+            plt.plot(
+                grouped["confidence"],
+                grouped["accuracy"],
+                marker="o",
+                label=prefix
+            )
+
+
+        # ideal calibration
+        plt.plot([0, 1], [0, 1], linestyle="--", label="Ideal")
+
+
+        plt.xlabel("Prediction Confidence (P(Top Token))")
+        plt.ylabel("Model Accuracy")
+        plt.title(f"Calibration Curve ({split} Set)")
+        plt.legend()
+
+
+        if save_filename:
+            folder_path = Path(f"{self.graphs_folder}/{split}")
+            folder_path.mkdir(parents=True, exist_ok=True)
+            save_path = folder_path / save_filename
+            plt.savefig(save_path, dpi=300, bbox_inches="tight")
+
+
+        if show:
+            plt.show()
+
+
+    def _calibration_plots_by_family(self, df: pd.DataFrame, split: str, show: bool = False):
+        df = df[df['Split'] == split].dropna(subset=["TopLogProb", "Correct"]).copy()
+        df["Confidence"] = np.exp(df["TopLogProb"])
+        df["FullPrefix"] = df["Model"] + "_" + df["Type"]
+
+
+        families = {
+            "llama3.1": df[df["Model"].str.contains("llama-3.1", case=False)],
+            "llama3.2": df[df["Model"].str.contains("llama-3.2", case=False)],
+            "qwen14b": df[df["Model"].str.contains("qwen", case=False)],
+        }
+
+
+        for fam_name, subdf in families.items():
+
+
+            if subdf.empty:
+                if self.debug:
+                    print(f"Subdf for family '{fam_name}' is empty")
+                continue
+
+
+            plt.figure(figsize=(7, 6))
+            prefixes = sorted(subdf["FullPrefix"].unique())
+            base_prefixes = [p for p in prefixes if "_base" in p.strip().lower()]
+            lora_prefixes = [p for p in prefixes if "_lora" in p.strip().lower()]
+
+
+            # lora is orange, base is blue
+            blue_palette = cm.Blues(np.linspace(0.4, 0.85, len(base_prefixes)))
+            orange_palette = cm.YlOrBr(np.linspace(0.4, 0.9, len(lora_prefixes)))
+
+
+            color_map = {}
+
+
+            for p, c in zip(base_prefixes, blue_palette):
+                color_map[p] = c
+
+
+            for p, c in zip(lora_prefixes, orange_palette):
+                color_map[p] = c
+
+
+            for prefix in prefixes:
+
+
+                mdf = subdf[subdf["FullPrefix"] == prefix].copy()
+
+
+                if len(mdf) == 0:
+                    continue
+
+
+                mdf["ConfBin"] = pd.cut(mdf["Confidence"], bins=10)
+
+
+                grouped = mdf.groupby("ConfBin").agg(
+                    accuracy=("Correct", "mean"),
+                    confidence=("Confidence", "mean")
+                ).reset_index()
+
+
+                plt.plot(
+                    grouped["confidence"],
+                    grouped["accuracy"],
+                    marker="o",
+                    label=prefix,
+                    color=color_map.get(prefix, None)
+                )
+
+
+            # ideal calibration line
+            plt.plot([0, 1], [0, 1], linestyle="--", color="black", label="Ideal")
+
+
+            plt.xlabel("Prediction Confidence (P(Top Token))")
+            plt.ylabel("Model Accuracy")
+            plt.title(f"Calibration Curve: {fam_name}")
+            plt.legend()
+
+
+            folder_path = Path(f"{self.graphs_folder}/{split}")
+            save_path = folder_path / f"calibration_{fam_name}.png"
+            folder_path.mkdir(parents=True, exist_ok=True)
+            plt.savefig(save_path, dpi=300, bbox_inches="tight")
+
+
+            if show:
+                plt.show()
+
+
+            plt.close()
+   
+    def confidence_analysis(self, split: str, show_plots=False):
+
+
+        tabulars = self.load_tabulars()
+        if not tabulars:
+            print("No data loaded.")
+            return
+
+
+        conf_df = self._collect_confidence_df(tabulars)
+
+
+        if conf_df.empty:
+            print("No confidence columns found.")
+            return
+
+
+        self._confidence_plot(
+            conf_df,
+            split=split, 
+            save_filename=f"{self.train_plan}_confidence_summary.png",
+            show=show_plots
+        )
+
+
+        self._confidence_vs_accuracy(
+            conf_df,
+            split=split, 
+            save_filename=f"{self.train_plan}_confidence_calibration.png",
+            show=show_plots
+        )
+
+
+        self._calibration_plots_by_family(
+            conf_df,
+            split=split, 
+        )
+
+
+        conf_df.to_csv(
+            self.results_folder / f"{split}_confidence_metrics.csv",
+            index=False
+        )
+    # ----------------------------
+    # Prediction Distribution / Collapse Analysis
+    # ----------------------------
+    def _prediction_distribution_plot(
+        self,
+        tabulars_dict: Dict[str, pd.DataFrame],
+        split: str = "test",
+        save_filename: str = None,
+        show: bool = False,
+        granular: bool = True,
+    ):
+        """
+        Creates a normalized stacked bar chart showing
+        prediction distributions for every model
+        (base + lora).
+
+        Parameters
+        ----------
+        granular : bool
+            If True:
+                - Each response choice gets its own shade
+                (multiple greens/reds).
+            If False:
+                - Only two categories are shown:
+                Valid (green) vs Invalid (red).
+        """
+
+        if split not in tabulars_dict:
+            raise ValueError(f"Split '{split}' not found in tabulars.")
+
+        df = tabulars_dict[split]
+        pred_cols = [c for c in df.columns if c.endswith("_pred")]
+
+        if len(pred_cols) == 0:
+            raise ValueError("No *_pred columns found.")
+
+        all_answers = sorted(
+            pd.unique(
+                pd.concat(
+                    [df[col].dropna() for col in pred_cols],
+                    ignore_index=True
+                )
+            )
+        )
+
+        # Optional: enforce Likert ordering
+        likert_order = ["A", "B", "C", "D", "E"]
+
+        if set(likert_order).issuperset(set(all_answers)):
+            all_answers = [x for x in likert_order if x in all_answers]
+
+        dist_rows = []
+
+        for col in pred_cols:
+            counts = (
+                df[col]
+                .value_counts(normalize=True)
+                .reindex(all_answers, fill_value=0)
+            )
+
+            row = {"Model": col.replace("_pred", "")}
+
+            for ans in all_answers:
+                row[ans] = counts[ans]
+
+            dist_rows.append(row)
+
+        dist_df = pd.DataFrame(dist_rows)
+
+        # Sort base models first
+        dist_df["TypeOrder"] = dist_df["Model"].apply(
+            lambda x: 0 if "base" in x.lower() else 1
+        )
+
+        dist_df = (
+            dist_df
+            .sort_values(["TypeOrder", "Model"])
+            .drop(columns="TypeOrder")
+        )
+
+        # Define valid responses
+        valid_answers = {
+            "A", "A.",
+            "B", "B.",
+            "C", "C.",
+            "D", "D.",
+            "E", "E."
+        }
+
+        valid_cols = [a for a in all_answers if a in valid_answers]
+        invalid_cols = [a for a in all_answers if a not in valid_answers]
+
+        sns.set_style("whitegrid")
+
+        fig, ax = plt.subplots(figsize=(18, 8))
+
+        bottom = np.zeros(len(dist_df))
+
+        if granular:
+
+            green_palette = sns.color_palette(
+                "Greens",
+                n_colors=max(len(valid_cols) + 2, 3)
+            )[2:]
+
+            red_palette = sns.color_palette(
+                "Reds",
+                n_colors=max(len(invalid_cols) + 2, 3)
+            )[2:]
+
+            color_map = {}
+
+            for ans, color in zip(valid_cols, green_palette):
+                color_map[ans] = color
+
+            for ans, color in zip(invalid_cols, red_palette):
+                color_map[ans] = color
+
+            ordered_answers = valid_cols + invalid_cols
+
+            for ans in ordered_answers:
+
+                vals = dist_df[ans].values
+
+                ax.bar(
+                    dist_df["Model"],
+                    vals,
+                    bottom=bottom,
+                    color=color_map[ans],
+                    edgecolor="white",
+                    linewidth=0.5
+                )
+
+                bottom += vals
+
+            legend_handles = []
+
+            if len(valid_cols) > 0:
+                legend_handles.append(
+                    Patch(
+                        facecolor=green_palette[-1],
+                        label="Valid"
+                    )
+                )
+
+            if len(invalid_cols) > 0:
+                legend_handles.append(
+                    Patch(
+                        facecolor=red_palette[-1],
+                        label="Invalid"
+                    )
+                )
+
+        else:
+
+            valid_vals = dist_df[valid_cols].sum(axis=1).values
+            invalid_vals = dist_df[invalid_cols].sum(axis=1).values
+
+            valid_color = "forestgreen"
+            invalid_color = "firebrick"
+
+            ax.bar(
+                dist_df["Model"],
+                valid_vals,
+                bottom=bottom,
+                color=valid_color,
+                edgecolor="white",
+                linewidth=0.5,
+                label="Valid"
+            )
+
+            bottom += valid_vals
+
+            ax.bar(
+                dist_df["Model"],
+                invalid_vals,
+                bottom=bottom,
+                color=invalid_color,
+                edgecolor="white",
+                linewidth=0.5,
+                label="Invalid"
+            )
+
+            legend_handles = [
+                Patch(facecolor=valid_color, label="Valid"),
+                Patch(facecolor=invalid_color, label="Invalid")
+            ]
+
+        ax.set_ylim(0, 1)
+
+        ax.set_ylabel("Prediction Proportion")
+        ax.set_xlabel("Model")
+
+        title_suffix = (
+            "Granular"
+            if granular
+            else "General"
+        )
+
+        ax.set_title(
+            f"{title_suffix} Prediction Distributions "
+            f"({split.capitalize()} Set)"
+        )
+
+        plt.xticks(rotation=45, ha="right")
+
+        ax.legend(
+            handles=legend_handles,
+            title="Prediction Type",
+            bbox_to_anchor=(1.02, 1),
+            loc="upper left"
+        )
+
+        plt.tight_layout()
+
+        if save_filename:
+
+            self.results_folder.mkdir(
+                parents=True,
+                exist_ok=True
+            )
+
+            save_path = (
+                self.results_folder / save_filename
+            )
+
+            plt.savefig(
+                save_path,
+                dpi=300,
+                bbox_inches="tight"
+            )
+
+            if self.verbose:
+                print(
+                    f"Saved prediction distribution plot to: "
+                    f"{save_path}"
+                )
+
+        if show:
+            plt.show()
+
+        plt.close()
+
+
+    def prediction_distribution_analysis(
+        self,
+        split: str = "test",
+        show_plots: bool = False,
+        granular: bool = True,
+    ):
+        """
+        Main entry point for prediction
+        collapse visualization.
+        """
+
+        if self.verbose:
+            print("Generating predictio distribution analysis...")
+
+        tabulars = self.load_tabulars(
+            splits=[split]
+        )
+
+        if not tabulars:
+            print("No tabulars loaded.")
+            return
+
+        suffix = (
+            "granular"
+            if granular
+            else "general"
+        )
+
+        self._prediction_distribution_plot(
+            tabulars_dict=tabulars,
+            split=split,
+            save_filename=(
+                f"{self.train_plan}_"
+                f"prediction_distribution_"
+                f"{suffix}.png"
+            ),
+            show=show_plots,
+            granular=granular
+        )
