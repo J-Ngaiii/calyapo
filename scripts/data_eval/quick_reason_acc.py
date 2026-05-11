@@ -36,10 +36,23 @@ def chart_accuracy(lookup, train_plan, run_keyword, full_report=True):
     scores = list(accuracies.values())
 
     plt.figure(figsize=(10, 6))
-    plt.bar(names, scores, color='skyblue')
-    plt.title(f"Model Inference Accuracy ({run_keyword})")
-    plt.ylabel("Accuracy")
+    bars = plt.bar(names, scores, color='skyblue')
+
+    plt.title(f"Model Inference Test Set Accuracy")
+    plt.ylabel("Model Accuracy")
+    plt.ylim(0, 1.0)
     plt.xticks(rotation=45, ha='right')
+
+    for bar, score in zip(bars, scores):
+        plt.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height(),
+            f"{score:.3f}",
+            ha='center',
+            va='bottom',
+            fontsize=9
+        )
+
     plt.tight_layout()
     plt.savefig("all_models_accuracy.png")
     plt.show()
@@ -58,12 +71,60 @@ def chart_accuracy(lookup, train_plan, run_keyword, full_report=True):
         comp_scores = [qwen_models[best_qwen], llama_models[best_llama]]
 
         plt.figure(figsize=(6, 6))
-        plt.bar(comp_names, comp_scores, color=['orange', 'lightgreen'])
-        plt.title("Reasoning vs. Non-Reasoning Performance")
-        plt.ylabel("Accuracy")
+        bars = plt.bar(comp_names, comp_scores, color=['orange', 'lightgreen'])
+        for bar, score in zip(bars, comp_scores):
+            plt.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height(),
+                f"{score:.3f}",
+                ha='center',
+                va='bottom',
+                fontsize=9
+            )
+        plt.title("Reasoning vs. Non-Reasoning Test Set Accuracy")
+        plt.ylabel("Model Accuracy")
         plt.ylim(0, 1.0) # Standardize scale for comparison
         plt.tight_layout()
         plt.savefig("reasoning_vs_non_reasoning.png")
+        plt.show()
+
+    # 4. Instruct vs Base Comparison
+
+    def is_instruct(model_name: str) -> bool:
+        return "Instruct" in model_name
+
+    base_models = {k: v for k, v in accuracies.items() if not is_instruct(k)}
+    instruct_models = {k: v for k, v in accuracies.items() if is_instruct(k)}
+
+    if base_models and instruct_models:
+        best_base = max(base_models, key=base_models.get)
+        best_instruct = max(instruct_models, key=instruct_models.get)
+
+        labels = [
+            f"Best Base\n({best_base.split('/')[-1]})",
+            f"Best Instruct\n({best_instruct.split('/')[-1]})"
+        ]
+        scores = [base_models[best_base], instruct_models[best_instruct]]
+
+        plt.figure(figsize=(6, 6))
+        bars = plt.bar(labels, scores, color=["steelblue", "darkorange"])
+
+        plt.title("Best Base vs Best Instruct Model")
+        plt.ylabel("Accuracy")
+        plt.ylim(0, 1.0)
+
+        for bar, score in zip(bars, scores):
+            plt.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height(),
+                f"{score:.3f}",
+                ha='center',
+                va='bottom',
+                fontsize=10
+            )
+
+        plt.tight_layout()
+        plt.savefig("best_base_vs_instruct.png")
         plt.show()
 
 if __name__ == "__main__":
@@ -74,16 +135,28 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
+    # All these are test set inference outputs
     LOOKUP = {
-        "meta-llama/Llama-3.1-8B-Instruct": "results_test_os_lora_20260503_181527", 
-        "meta-llama/Llama-3.2-3B": "results_test_os_lora_20260503_192154",
-        "meta-llama/Llama-3.2-3B-Instruct": "results_test_os_lora_20260503_192254", 
-        "Qwen/Qwen2.5-14B": "results_test_os_lora_20260503_201244", 
-        "Qwen/Qwen2.5-14B": "results_test_os_lora_20260503_201754", 
+        "opinion_school" : {
+            "meta-llama/Llama-3.1-8B": "results_test_os_lora_20260508_005922", 
+            "meta-llama/Llama-3.1-8B-Instruct": "results_test_os_lora_20260503_181527", 
+            "meta-llama/Llama-3.2-3B": "results_test_os_lora_20260503_192154",
+            "meta-llama/Llama-3.2-3B-Instruct": "results_test_os_lora_20260503_192254", 
+            "Qwen/Qwen2.5-14B": "results_test_os_lora_20260503_201244", 
+            "Qwen/Qwen2.5-14B-Instruct": "results_test_os_lora_20260503_201754", 
+            }, 
+        "presidents_to_abortion" : {
+            "meta-llama/Llama-3.1-8B": "results_test_p2a_lora_20260507_233430", 
+            "meta-llama/Llama-3.1-8B-Instruct": "results_test_p2a_lora_20260507_234607", 
+            "meta-llama/Llama-3.2-3B": "results_test_p2a_lora_20260507_031806",
+            "meta-llama/Llama-3.2-3B-Instruct": "results_test_p2a_lora_20260507_031630", 
+            "Qwen/Qwen2.5-14B": "results_test_p2a_lora_20260507_234812", 
+            "Qwen/Qwen2.5-14B-Instruct": "results_test_p2a_lora_20260507_234952", 
+            }
     }
 
     chart_accuracy(
-        lookup=LOOKUP, 
+        lookup=LOOKUP[args.train_plan], 
         train_plan=args.train_plan, 
         run_keyword=args.run_keyword, 
         full_report=args.full_report
