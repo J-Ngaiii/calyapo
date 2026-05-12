@@ -514,7 +514,10 @@ class Reporter:
                         print(f"Did not find survey question '{targ_question}' under 'topic' col in tabular for split: '{split}'. Only had the following topics: {split_tabular['topic'].unique()}")
                     continue
                 # col is either a 'true_answer' col or "_pred" cols that come from tabulars
-                sentiment_map = {'A': 1.0, 'B': 0.66, 'C': 0.33, 'D': 0.0}
+                sentiment_map = {'A': 1.0, 'A.': 1.0,  
+                                 'B': 0.66, 'B.': 0.66,
+                                 'C': 0.33, 'C.': 0.33, 
+                                 'D': 0.0, 'D.': 0.0}
                 sub_df['harmonized_score'] = sub_df[col].map(sentiment_map)
                 # geo_level_col_name comes from IGS intermediate and joining with IGS intermediate
                 stats = sub_df.groupby(geo_level_col_name).apply( 
@@ -1157,4 +1160,343 @@ class Reporter:
             ),
             show=show_plots,
             granular=granular
+        )
+
+    # -----------------------------
+    # Output Distribution Alignment
+    # -----------------------------
+    def _distribution_heatmap(
+        self,
+        df: pd.DataFrame,
+        split: str,
+        score: str,
+        save_filename: str = None,
+        show: bool = False
+    ):
+        """
+        Heatmap of model performance across demographics.
+        Lower KL/WD = better.
+        """
+
+        sns.set_style("white")
+
+        subdf = df[df["Split"] == split].copy()
+
+        avg_scores = (
+            subdf
+            .groupby(["Model", "Demographic"])[score]
+            .mean()
+            .reset_index()
+        )
+
+        pivot = avg_scores.pivot(
+            index="Model",
+            columns="Demographic",
+            values=score
+        )
+
+        plt.figure(figsize=(12, 7))
+
+        sns.heatmap(
+            pivot,
+            annot=True,
+            fmt=".3f",
+            cmap="viridis_r",
+            linewidths=0.5,
+            cbar_kws={"label": score}
+        )
+
+        plt.title(
+            f"{score} Across Models and Demographics "
+            f"({split.capitalize()} Set)"
+        )
+
+        plt.xlabel("Demographic")
+        plt.ylabel("Model")
+
+        plt.tight_layout()
+
+        if save_filename:
+            folder_path = Path(f"{self.graphs_folder}/{split}")
+            folder_path.mkdir(parents=True, exist_ok=True)
+
+            save_path = folder_path / save_filename
+
+            plt.savefig(
+                save_path,
+                dpi=300,
+                bbox_inches="tight"
+            )
+
+            if self.verbose:
+                print(f"Saved heatmap to: {save_path}")
+
+        if show:
+            plt.show()
+
+        plt.close()
+
+    def _distribution_violinplot(
+        self,
+        df: pd.DataFrame,
+        split: str,
+        score: str,
+        save_filename: str = None,
+        show: bool = False
+    ):
+        """
+        Violin plot showing distributional
+        performance spread across demographics.
+        """
+
+        sns.set_style("whitegrid")
+
+        subdf = df[df["Split"] == split].copy()
+
+        plt.figure(figsize=(14, 7))
+
+        sns.violinplot(
+            data=subdf,
+            x="Model",
+            y=score,
+            inner="box",
+            cut=0
+        )
+
+        plt.xticks(rotation=45, ha="right")
+
+        plt.title(
+            f"{score} Distribution Across Demographics "
+            f"({split.capitalize()} Set)"
+        )
+
+        plt.ylabel(score)
+        plt.xlabel("Model")
+
+        plt.tight_layout()
+
+        if save_filename:
+            folder_path = Path(f"{self.graphs_folder}/{split}")
+            folder_path.mkdir(parents=True, exist_ok=True)
+
+            save_path = folder_path / save_filename
+
+            plt.savefig(
+                save_path,
+                dpi=300,
+                bbox_inches="tight"
+            )
+
+            if self.verbose:
+                print(f"Saved violin plot to: {save_path}")
+
+        if show:
+            plt.show()
+
+        plt.close()
+
+    def _distribution_pareto_plot(
+        self,
+        df: pd.DataFrame,
+        split: str,
+        score: str,
+        save_filename: str = None,
+        show: bool = False
+    ):
+        """
+        Pareto-style plot:
+        x-axis = mean metric
+        y-axis = std deviation
+
+        Lower-left = best overall + most stable.
+        """
+
+        sns.set_style("whitegrid")
+
+        subdf = df[df["Split"] == split].copy()
+
+        grouped = (
+            subdf
+            .groupby("Model")[score]
+            .agg(["mean", "std"])
+            .reset_index()
+        )
+
+        plt.figure(figsize=(9, 7))
+
+        sns.scatterplot(
+            data=grouped,
+            x="mean",
+            y="std",
+            s=150
+        )
+
+        for _, row in grouped.iterrows():
+            plt.text(
+                row["mean"],
+                row["std"],
+                row["Model"],
+                fontsize=8,
+                ha="left",
+                va="bottom"
+            )
+
+        plt.xlabel(f"Mean {score}")
+        plt.ylabel(f"Std Dev {score}")
+
+        plt.title(
+            f"Pareto Frontier: Fidelity vs Stability "
+            f"({split.capitalize()} Set)"
+        )
+
+        plt.tight_layout()
+
+        if save_filename:
+            folder_path = Path(f"{self.graphs_folder}/{split}")
+            folder_path.mkdir(parents=True, exist_ok=True)
+
+            save_path = folder_path / save_filename
+
+            plt.savefig(
+                save_path,
+                dpi=300,
+                bbox_inches="tight"
+            )
+
+            if self.verbose:
+                print(f"Saved pareto plot to: {save_path}")
+
+        if show:
+            plt.show()
+
+        plt.close()
+
+    def _best_model_plot(
+        self,
+        df: pd.DataFrame,
+        split: str,
+        score: str,
+        save_filename: str = None,
+        show: bool = False
+    ):
+        """
+        For each demographic group, selects the model with the lowest
+        (best) score and plots the results as a bar chart, color-coded
+        by model name.
+        """
+        subdf = df[df['Split'] == split].copy()
+        avg_scores = subdf.groupby(['Demographic', 'Model'])[score].mean().reset_index()
+        best_models = avg_scores.loc[
+            avg_scores.groupby('Demographic')[score].idxmin()
+        ]
+        best_models = best_models.sort_values(by=score, ascending=False)
+        best_scores = best_models[score]
+
+        unique_models = best_models['Model'].unique()
+        colors_palette = plt.cm.get_cmap('tab10', len(unique_models))
+        model_color_map = {m: colors_palette(i) for i, m in enumerate(unique_models)}
+        bar_colors = [model_color_map[m] for m in best_models['Model']]
+
+        plt.figure(figsize=(12, 7))
+        bars = plt.bar(
+            best_models['Demographic'],
+            best_models[score],
+            color=bar_colors,
+            edgecolor='black'
+        )
+
+        for bar, model_score in zip(bars, best_scores):
+            plt.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height(),
+                f'{model_score:.3f}',
+                va='bottom', ha='center',
+                fontsize=10
+            )
+
+        handles = [
+            Patch(facecolor=model_color_map[m], label=m)
+            for m in unique_models
+        ]
+        plt.legend(handles=handles, title='Model', bbox_to_anchor=(1.02, 1), loc='upper left', prop={'size': 12}, title_fontsize=12)
+
+        plt.title(f'Best Model per Demographic Group ({self.train_plan})', fontsize=14)
+        plt.xlabel('Demographic Group', fontsize=12)
+        plt.ylabel(f'Average {score}', fontsize=12)
+        plt.xticks(rotation=45, ha='right')
+        plt.grid(axis='y', linestyle='--', alpha=0.7)
+        plt.tight_layout()
+
+        if save_filename:
+            folder_path = Path(f"{self.graphs_folder}/{split}")
+            folder_path.mkdir(parents=True, exist_ok=True)
+            save_path = folder_path / save_filename
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            if self.verbose:
+                print(f"Saved best-model plot to: {save_path}")
+
+        if show:
+            plt.show()
+
+        plt.close()
+
+    def distributional_alignment_analysis(
+        self,
+        split: str = "test",
+        score: str = "WD_Weighted",
+        show_plots: bool = False
+    ):
+        """
+        Generates:
+        - Heatmap
+        - Violin plot
+        - Pareto frontier plot
+
+        using distributional accuracy metrics.
+        """
+
+        metrics_path = (
+            self.results_folder
+            / "distributional_accuracy"
+            / "summary_demog_metrics.csv"
+        )
+
+        if not metrics_path.exists():
+            raise FileNotFoundError(
+                "summary_demog_metrics.csv not found. "
+                "Run distributional_accuracy() first."
+            )
+
+        df = pd.read_csv(metrics_path)
+
+        self._best_model_plot(
+            df=df,
+            split=split,
+            score=score,
+            save_filename=f"{self.train_plan}_{score}_best_model.png",
+            show=show_plots
+        )
+
+        self._distribution_heatmap(
+            df=df,
+            split=split,
+            score=score,
+            save_filename=f"{self.train_plan}_{score}_heatmap.png",
+            show=show_plots
+        )
+
+        self._distribution_violinplot(
+            df=df,
+            split=split,
+            score=score,
+            save_filename=f"{self.train_plan}_{score}_violin.png",
+            show=show_plots
+        )
+
+        self._distribution_pareto_plot(
+            df=df,
+            split=split,
+            score=score,
+            save_filename=f"{self.train_plan}_{score}_pareto.png",
+            show=show_plots
         )

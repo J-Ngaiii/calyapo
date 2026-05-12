@@ -16,6 +16,7 @@ def main():
     parser.add_argument("--only_conf", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--only_pred", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--only_distrib", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--only_dist_align", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--full_analysis", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--verbose", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--debug", action=argparse.BooleanOptionalAction, default=True)
@@ -64,6 +65,12 @@ def main():
     if args.only_pred:
         rep.prediction_distribution_analysis(split=args.split, granular=True)
         rep.prediction_distribution_analysis(split=args.split, granular=False)
+    if args.only_dist_align:
+        # rep.distributional_accuracy(demog_col_indices=[0]) # only uncomment if distrib_acc not found
+
+        alignment_metrics = ['KL_Weighted', 'WD_Weighted']
+        for metric in alignment_metrics:
+            rep.distributional_alignment_analysis(split=args.split, score=metric)
 
 
 if __name__ == "__main__":
