@@ -99,8 +99,8 @@ MODEL_NICKNAME="llama3.1-8b"
 # MODEL_NAME="Qwen/Qwen2.5-7B"
 # MODEL_NICKNAME="qwen2.5-7b"
 
-# MODEL_NAME="Qwen/Qwen2.5-7B-Instruct"
-# MODEL_NICKNAME="qwen2.5-7b-Instruct"
+MODEL_NAME="Qwen/Qwen2.5-7B-Instruct"
+MODEL_NICKNAME="qwen2.5-7b-Instruct"
 
 # MODEL_NAME="Qwen/Qwen2.5-14B"
 # MODEL_NICKNAME="qwen2.5-14b"
@@ -108,7 +108,7 @@ MODEL_NICKNAME="llama3.1-8b"
 # MODEL_NAME="Qwen/Qwen2.5-14B-Instruct"
 # MODEL_NICKNAME="qwen2.5-14b-Instruct"
 
-DATASET="opinion_school_dataset"
+DATASET="presidents_to_abortion_dataset"
 OUTPUT_DIR="calyapo/training/checkpoints/${DATASET}"
 USE_PEFT=True
 BATCH_SIZE_TRAINING=4

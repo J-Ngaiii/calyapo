@@ -2,6 +2,7 @@ import json
 import re
 import ast
 import pandas as pd
+import numpy as np
 from pathlib import Path
 from typing import List, Dict, Union
 from calyapo.configurations.config import UNIVERSAL_FINAL_FOLDER
@@ -124,32 +125,45 @@ class Tabularizer:
                 print(f"Path '{file_path}' does not match regex pattern: '{self.file_pattern}'. Skipping forward...")
         return found
     
-    # def _parse_logprobs_string(self, lp_str: str) -> tuple:
-    #     """
-    #     Parses the pseudo-Python Logprob string by converting it to valid JSON.
-    #     """
-    #     try:
-    #         if not lp_str or not isinstance(lp_str, str):
-    #             return None, None
-            
-    #         cleaned = lp_str.replace("Logprob(", "{").replace(")", "}")
-    #         cleaned = cleaned.replace("=", ":")
-    #         cleaned = re.sub(r"([a-zA-Z_]+):", r'"\1":', cleaned)
-    #         cleaned = cleaned.replace("'", '"')
-    #         lp_data = json.loads(cleaned)
-            
-    #         if not isinstance(lp_data, list) or len(lp_data) == 0:
-    #             return None, None
-                
-    #         first_token_options = lp_data[0]
-    #         sorted_options = sorted(first_token_options.values(), key=lambda x: x.get('rank', 99))
-    #         lp1 = sorted_options[0].get('logprob') if len(sorted_options) >= 1 else None
-    #         lp2 = sorted_options[1].get('logprob') if len(sorted_options) >= 2 else None
-            
-    #         return lp1, lp2
-    #     except Exception as e:
-    #         print(f"Error parsing logprobs: {e}")
-    #         return None, None
+    def _extract_confidence_metrics(self, lp_str: str) -> tuple:
+        """
+        Extract:
+            1. top token logprob
+            2. top-2 logprob difference
+            3. std dev across top 5 logprobs
+        """
+
+        try:
+            if not lp_str or not isinstance(lp_str, str):
+                return None, None, None
+            logprobs = [
+                float(x)
+                for x in re.findall(r"logprob=([-0-9\.]+)", lp_str)
+            ]
+            ranks = [
+                int(x)
+                for x in re.findall(r"rank=(\d+)", lp_str)
+            ]
+
+            if len(logprobs) == 0:
+                return None, None, None
+            if len(ranks) == len(logprobs):
+                sorted_pairs = sorted(zip(ranks, logprobs), key=lambda x: x[0])
+                logprobs = [x[1] for x in sorted_pairs]
+
+            top_logprob = logprobs[0]
+            top2_diff = (
+                logprobs[0] - logprobs[1]
+                if len(logprobs) >= 2
+                else None
+            )
+            top5_sd = float(np.std(logprobs[:5]))
+            return top_logprob, top2_diff, top5_sd
+
+        except Exception as e:
+            if self.verbose:
+                print(f"Error parsing confidence metrics: {e}")
+            return None, None, None
 
     def run_pipeline(self, model_map: Dict[str, str]):
         """
@@ -198,18 +212,23 @@ class Tabularizer:
                 
                 col_pred = f"{model_nickname}_{model_type}_pred"
                 col_corr = f"{model_nickname}_{model_type}_correct"
-                # col_lp1 = f"{model_nickname}_{model_type}_lp1"
-                # col_lp2 = f"{model_nickname}_{model_type}_lp2"
                 
                 df_calyapo[col_pred] = df_inf['prediction'].values
                 df_calyapo[col_corr] = df_inf['is_correct'].values
 
-                # if 'logprobs' in df_inf.columns:
-                #     if self.verbose: 
-                #         print(f"Extracting logprobs for {model_nickname} {model_type}...")
-                #     parsed = df_inf['logprobs'].apply(self._parse_logprobs_string)
-                #     df_calyapo[col_lp1] = [x[0] for x in parsed]
-                #     df_calyapo[col_lp2] = [x[1] for x in parsed]
+                if 'logprobs' in df_inf.columns:
+                    if self.verbose:
+                        print(f"Extracting confidence metrics for {model_nickname} {model_type}...")
+
+                    parsed = df_inf['logprobs'].apply(self._extract_confidence_metrics)
+
+                    col_top_lp = f"{model_nickname}_{model_type}_top_logprob"
+                    col_top2_diff = f"{model_nickname}_{model_type}_top2_diff"
+                    col_top5_sd = f"{model_nickname}_{model_type}_top5_sd"
+
+                    df_calyapo[col_top_lp] = [x[0] for x in parsed]
+                    df_calyapo[col_top2_diff] = [x[1] for x in parsed]
+                    df_calyapo[col_top5_sd] = [x[2] for x in parsed]
 
         for split, df in combined_dataframes.items():
             if not df.empty:
