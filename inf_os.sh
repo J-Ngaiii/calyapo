@@ -44,7 +44,7 @@ fi
 
 # Activate your virtual environment
 source /global/home/users/jonathanngai/miniconda3/etc/profile.d/conda.sh
-conda activate calypo
+conda activate calyapo
 if [ $? -ne 0 ]; then
   echo "Error: Could not activate virtual environment. Exiting."
   exit 1
@@ -77,13 +77,13 @@ TRAIN_PLAN="opinion_school"
 # MODEL_NICKNAME="llama3.2-3b-Instruct"
 # ADAPTER_FOLDER="wdllama3.2-3b-Instruct_wd0.1_gam0.85_lr1e-05_2026-05-03-12-27-51AM"
 
-MODEL_NAME="Qwen/Qwen2.5-7B"
-MODEL_NICKNAME="qwen2.5-7b"
-ADAPTER_FOLDER="wdqwen2.5-7b_wd0.1_gam0.85_lr1e-05_2026-05-10-12-02-49PM"
+# MODEL_NAME="Qwen/Qwen2.5-7B"
+# MODEL_NICKNAME="qwen2.5-7b"
+# ADAPTER_FOLDER="wdqwen2.5-7b_wd0.1_gam0.85_lr1e-05_2026-05-10-12-02-49PM"
 
-# MODEL_NAME="Qwen/Qwen2.5-7B-Instruct"
-# MODEL_NICKNAME="qwen2.5-7b-Instruct"
-# ADAPTER_FOLDER="wdqwen2.5-7b-Instruct_wd0.1_gam0.85_lr1e-05_2026-05-10-12-00-04PM"
+MODEL_NAME="Qwen/Qwen2.5-7B-Instruct"
+MODEL_NICKNAME="qwen2.5-7b-Instruct"
+ADAPTER_FOLDER="wdqwen2.5-7b-Instruct_wd0.1_gam0.85_lr1e-05_2026-05-10-12-00-04PM"
 
 # MODEL_NAME="Qwen/Qwen2.5-14B"
 # MODEL_NICKNAME="qwen2.5-14b"

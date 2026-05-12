@@ -37,7 +37,7 @@ fi
 
 # Activate your virtual environment
 source /global/home/users/jonathanngai/miniconda3/etc/profile.d/conda.sh
-conda activate calypo
+conda activate calyapo
 if [ $? -ne 0 ]; then
   echo "Error: Could not activate virtual environment. Exiting."
   exit 1
@@ -53,7 +53,7 @@ NPROC_PER_NODE=1
 MASTER_PORT=$(expr 10000 + $(echo -n $SLURM_JOBID | tail -c 4)) # Random port to avoid collisions
 
 # Model/Data Params for opinion_school
-TRAIN_PLAN="presidents_to_abortion"
+TRAIN_PLAN="opinion_school"
 MODEL_NAME="gemini-2.5-flash"
 MODEL_NICKNAME="gemini-2.5-flash"
 MODEL_TYPE="gemini" 

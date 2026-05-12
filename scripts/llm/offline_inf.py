@@ -8,7 +8,7 @@ from datetime import datetime
 import argparse
 import time
 from dotenv import load_dotenv
-from google import genai
+import google.genai as genai
 from google.genai import types
 from openai import OpenAI
 load_dotenv()
