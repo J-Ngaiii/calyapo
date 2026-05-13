@@ -1455,19 +1455,22 @@ class Reporter:
         using distributional accuracy metrics.
         """
 
-        metrics_path = (
-            self.results_folder
-            / "distributional_accuracy"
-            / "summary_demog_metrics.csv"
-        )
+        metrics_path = self.results_folder / Path("distributional_accuracy/summary_demog_metrics.csv")
+        granular_metrics_path = self.results_folder / Path("distributional_accuracy/aggregated_kl_metrics.csv") # it says kl but it includes wd that's my bad
 
         if not metrics_path.exists():
             raise FileNotFoundError(
                 "summary_demog_metrics.csv not found. "
                 "Run distributional_accuracy() first."
             )
+        if not granular_metrics_path.exists():
+            raise FileNotFoundError(
+                "aggregated_kl_metrics.csv not found. "
+                "Run distributional_accuracy() first."
+            )
 
         df = pd.read_csv(metrics_path)
+        gran_df = pd.read_csv(granular_metrics_path)
 
         self._best_model_plot(
             df=df,
@@ -1486,7 +1489,7 @@ class Reporter:
         )
 
         self._distribution_violinplot(
-            df=df,
+            df=gran_df,
             split=split,
             score=score,
             save_filename=f"{self.train_plan}_{score}_violin.png",
@@ -1494,7 +1497,7 @@ class Reporter:
         )
 
         self._distribution_pareto_plot(
-            df=df,
+            df=gran_df,
             split=split,
             score=score,
             save_filename=f"{self.train_plan}_{score}_pareto.png",

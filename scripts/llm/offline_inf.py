@@ -11,6 +11,8 @@ from dotenv import load_dotenv
 import google.genai as genai
 from google.genai import types
 from openai import OpenAI
+
+from calyapo.data_eval.correctness import pred_is_correct
 load_dotenv()
 
 # --- Configuration ---
@@ -238,7 +240,7 @@ def run_inference(engine_params, sampling_params, split, train_plan, input_path,
                 "index": i,
                 "prediction": generated_text,
                 "true_label": true_label,
-                "is_correct": generated_text.startswith(true_label),
+                "is_correct": pred_is_correct(llm_out=generated_text, true_ans=true_label),
                 "logprobs": str(logprobs_data) 
             }
             f.write(json.dumps(result) + "\n")

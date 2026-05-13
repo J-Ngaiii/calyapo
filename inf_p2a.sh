@@ -37,7 +37,7 @@ fi
 
 # Activate your virtual environment
 source /global/home/users/jonathanngai/miniconda3/etc/profile.d/conda.sh
-conda activate calypo
+conda activate calyapo
 if [ $? -ne 0 ]; then
   echo "Error: Could not activate virtual environment. Exiting."
   exit 1
@@ -70,9 +70,9 @@ TRAIN_PLAN="presidents_to_abortion"
 # MODEL_NICKNAME="llama3.2-3b-Instruct"
 # ADAPTER_FOLDER="wdllama3.2-3b-Instruct_wd0.1_gam0.85_lr1e-05_2026-05-03-10-11-25AM"
 
-MODEL_NAME="Qwen/Qwen2.5-7B"
-MODEL_NICKNAME="qwen2.5-7b"
-ADAPTER_FOLDER="wdqwen2.5-7b_wd0.1_gam0.85_lr1e-05_2026-05-11-09-22-07PM"
+# MODEL_NAME="Qwen/Qwen2.5-7B"
+# MODEL_NICKNAME="qwen2.5-7b"
+# ADAPTER_FOLDER="wdqwen2.5-7b_wd0.1_gam0.85_lr1e-05_2026-05-11-09-22-07PM"
 
 # MODEL_NAME="Qwen/Qwen2.5-7B-Instruct"
 # MODEL_NICKNAME="qwen2.5-7b-Instruct"
@@ -82,15 +82,15 @@ ADAPTER_FOLDER="wdqwen2.5-7b_wd0.1_gam0.85_lr1e-05_2026-05-11-09-22-07PM"
 # MODEL_NICKNAME="qwen2.5-14b"
 # ADAPTER_FOLDER="wdqwen2.5-14b_wd0.1_gam0.85_lr1e-05_2026-05-03-11-08-16AM"
 
-# MODEL_NAME="Qwen/Qwen2.5-14B-Instruct"
-# MODEL_NICKNAME="qwen2.5-14b-Instruct"
-# ADAPTER_FOLDER="wdqwen2.5-14b-Instruct_wd0.1_gam0.85_lr1e-05_2026-05-03-11-19-09AM"
+MODEL_NAME="Qwen/Qwen2.5-14B-Instruct"
+MODEL_NICKNAME="qwen2.5-14b-Instruct"
+ADAPTER_FOLDER="wdqwen2.5-14b-Instruct_wd0.1_gam0.85_lr1e-05_2026-05-03-11-19-09AM"
 
-# MODEL_TYPE="base" 
-MODEL_TYPE="lora" 
-# SPLIT="train"
+MODEL_TYPE="base" 
+# MODEL_TYPE="lora" 
+SPLIT="train"
 # SPLIT="val"
-SPLIT="test"
+# SPLIT="test"
 
 RUN_KEYWORD="archon"
 NUM_GPUS=1
