@@ -1,135 +1,279 @@
 # CalYAPo
 
-CalyAPO is Jonathan Ngai's Data Science Honors Thesis repository for analyzing California public opinion data and training neural net models.
+CalYAPo is a research repository for finetuning large language models (LLMs) on California sub-national public opinion data, developed as part of a Data Science Honors Thesis at UC Berkeley. The project investigates whether LLMs finetuned with Low-Rank Adaptation (LoRA) on state-level survey data can accurately predict individual-level survey responses — and how individual-level predictive performance trades off against aggregate distributional alignment.
 
-# Pipeline design
-- The cleaning functions in raw_cleaners.py clean_datasets.py and data_combiner.py are never supposed to interact with the Orchestrator class. The Orchestrator acts upon and manipulates functions in those files. 
-- The cleaning functions in raw_cleaners.py clean_datasets.py and data_combiner.py should not be pulling from paths directly but rather passing data in memory. The Orchestrator class can handle pulling. 
-- The cleaning functions in raw_cleaners.py clean_datasets.py and data_combiner.py need not have rigorous checks. The Individual class handles that. 
-- The cleaning functions in raw_cleaners.py clean_datasets.py and data_combiner.py get imported into DataSplitter that creates the train, val and tests splits end to end.
-- skipping missing data happens in split_combine's llama flatten helper
+The dataset (~19,000 individuals) is constructed from California-specific survey data collected by the [Berkeley Institute of Governmental Studies (IGS)](https://igs.berkeley.edu/).
 
-**overall hierarchy**
-- Individual cleaning functions execute operations on a per df batch basis
-- Handler funcs handle file pulling and in-memory data passing
-- Orchestrator string inputs/outputs from diff handlers together
+---
 
-# Stages of data
-- Raw (csv or dta or sav): Completely unprocessed
-- Intermediate (csv): Processed by raw_cleaners, all columns are readable by configs to be mapped to variable_labels like 'harris_opinion'
-- Processed (json): json form of each dataset-time period combination, basically a list of dictionaries with each dictionary corresponding to an individual with the train/val/test questions and responses and demographics per indiv_map
-- penultimate (json): compile all jsons from /processed directory based on dataset across time period
-- final (json): contains the actual steering : completion formatted jsons
+## Table of Contents
 
-# Adding new datasets
-- add to training/configs/datasets.py
-- add to training/datasets/__init__.py
+- [Hardware Requirements](#hardware-requirements)
+- [Installation](#installation)
+- [Data Access](#data-access)
+- [Data Pipeline](#data-pipeline)
+- [Finetuning](#finetuning)
+- [Inference](#inference)
+- [Evaluation](#evaluation)
+- [Repository Structure](#repository-structure)
+- [Adding New Datasets](#adding-new-datasets)
+- [Codebase Walkthrough](#codebase-walkthrough)
 
-# Table and Visualization Generation Code
-- Config file sets up different tables
-- Reader func (model name, base_or_lora, split, train_plan) loads results in as a dataframe then passes it to diff calculation functions
-- Calculation functions
+---
 
-# Finetuning execution
-- sbatch script executes caLL
-- scripts/experiment/run_finetune.py --> initiates fire call to execute the actual finetuning.py script
-- lines 152 --> create a config object from train_config.model_name, train_config itself comes from training/configs/training.py and should get overridden partially by arguments in the sbatch
-- lines 153-197 we define the 'model' object based on based on config.model_type
-- lines 328-342 --> get_preprocessed_dataset is called --> returns datasets
-    - get_preprocessed_dataset is defined in training/utils/dataset_utils what it does is:
-        - take in datset_config like that defined in training/configs/datasets.py
-        - access DATASET_PREPROC in training/datasets/__init__.py using dataset_config.dataset
-        - get the 'get_calyapo_dataset' method that's mapped in training/datasets/__init__.py but defined in training/datasets/calyapo_dataset.py
-        - initialize and execute the 'get_calyapo_dataset' method with 
-            - dataset_config
-            - tokenizer
-            - output of internally defined get_split() function which outputs dataset_config.train or dataset_config.test path directly based on the split get_preprocessed_dataset got initially
-        - get_calyapo_dataset then executes and returns 
-        - that recursively goes back yp to be the output of get_preprocessed_dataset
-- lines 416 the train() call actually happens, train() is defined in training/utils/train_utils.py
-    - line 241 of train_utils.py: evaluation() gets called
+## Hardware Requirements
 
-# Adding Metrics (all under train_utils.py)
-- for train metrics:
-    - line 105: add tracking lists under the 'if train_config.save_metrics' condition
-    - line 163: add metrics under train_config.save_metrics
-    - line 210: add metrics under wandb.log
-    - line 319: save metrics to json
-- for val metrics:
-    - line 105: add tracking lists under the 'if train_config.save_metrics' condition
-    - line 241: handle for evaluation() outputting more statistics then save them accordingly
-    - line 363: add validation tracking lists
-    - line 389: update validation tracking lists
-    - under line 419: remember to also calculate average of the metric across all epochs
-    - line 422: wandb update validation metrics
-    - line 428: return validation tracking lists
-    - line 319: save metrics to json
+Finetuning was conducted on the [UC Berkeley Savio HPC cluster](https://research-it.berkeley.edu/services-projects/high-performance-computing-savio) using a single NVIDIA A40 GPU (`savio3_gpu` partition). Inference runs were conducted on a single NVIDIA A5000 GPU (`savio4_gpu` partition).
 
-# To Do
-- uniqieID for training on multiple questions so the samplers dont need to de-duplicate
+The following models were evaluated:
 
-# repo structure
-\data
+| Model | Parameters | Type |
+|-------|-----------|------|
+| `meta-llama/Llama-3.1-8B` | 8B | Base |
+| `meta-llama/Llama-3.1-8B-Instruct` | 8B | Instruction-tuned |
+| `meta-llama/Llama-3.2-3B` | 3B | Base |
+| `meta-llama/Llama-3.2-3B-Instruct` | 3B | Instruction-tuned |
+| `Qwen/Qwen2.5-14B` | 14B | Base |
+| `Qwen/Qwen2.5-14B-Instruct` | 14B | Instruction-tuned |
 
---\raw
+All finetuning runs use 4-bit quantization and mixed precision (bf16) to fit within a single GPU's memory budget. The wall-clock time limit per finetuning job is 60 hours; inference jobs are capped at 10 hours.
 
-----\anes
+---
 
-----\ppic
+## Installation
 
-----\igs
+```bash
+conda create -n calyapo python=3.10 -y
+conda activate calyapo
+pip install -e .
+```
 
+---
 
+## Data Access
 
-\calyapo
+The CalYAPo dataset is derived from California public opinion surveys administered by the Berkeley Institute of Governmental Studies (IGS). Raw IGS poll data is publicly available for download from the [IGS Poll website](https://igs.berkeley.edu/research/berkeley-igs-poll). Once downloaded, place the raw files under `data/raw/igs/`.
 
---\configurations
+Expected raw data sources and their locations:
 
-----\config.py
+| Source | Format | Path |
+|--------|--------|------|
+| IGS (California) | `.sav` / `.dta` | `data/raw/igs/` |
+| ANES (National) | `.sav` / `.dta` | `data/raw/anes/` |
+| PPIC (California) | `.csv` | `data/raw/ppic/` |
 
-----\data_map_config.py
+---
 
-----\data_mappings.py
+## Data Pipeline
 
---\data_preprocessing
+Data moves through five stages from raw survey files to model-ready prompts:
 
-----\clean_datasets.py
+| Stage | Format | Description |
+|-------|--------|-------------|
+| **Raw** | `.csv`, `.dta`, `.sav` | Unprocessed survey files |
+| **Intermediate** | `.csv` | Cleaned by `raw_cleaners`; all columns are mapped to readable variable labels (e.g. `harris_opinion`) |
+| **Processed** | `.json` | One JSON per dataset–time-period combination; each entry is an individual with train/val/test questions, responses, and demographics |
+| **Penultimate** | `.json` | All processed JSONs compiled across time periods per dataset |
+| **Final** | `.json` | Prompt-completion formatted JSONs ready for finetuning |
 
-----\data_combiner.py
+**Architecture note:** Individual cleaning functions operate on a per-dataframe basis. Handler functions manage file I/O and in-memory data passing between stages.
 
-----\generate_steering_prompts.py
+### Quick commands
 
---\training (llama cookbook clone)
+```bash
+# Stage 1–2: Clean raw survey data to intermediate
+python calyapo/data_preprocessing/clean_datasets.py
 
-----\configs
+# Stage 3–5: Combine and format into train/val/test splits
+python calyapo/data_preprocessing/data_combiner.py
 
-----\data
+# Test prompt tokenization
+python calyapo/training/datasets/calyapo_dataset.py
+```
 
-----\datasets
+Data paths are defined in `calyapo/configurations/config.py`.
 
-----\inference
+---
 
-----\model_checkpoints
+## Finetuning
 
-----\policies
+Finetuning uses the [LLaMA Cookbook](https://github.com/meta-llama/llama-cookbook) framework with LoRA adapters. Jobs are submitted to Savio via SLURM:
 
-----\tools
+```bash
+sbatch scripts/experiment/finetune.slurm
+```
 
-----\utils
+The sbatch script sets training parameters as environment variables and launches training via `torchrun`:
 
-----\finetuning.py
+```bash
+torchrun --nnodes=1 \
+    --nproc-per-node=${NPROC_PER_NODE} \
+    --master_port=${MASTER_PORT} \
+    scripts/experiment/run_finetune.py \
+    --enable_fsdp False \
+    --use_peft True \
+    --quantization "4bit" \
+    --use_fast_kernels \
+    --peft_method='lora' \
+    --use_fp16 \
+    --mixed_precision \
+    --batch_size_training 4 \
+    --val_batch_size 8 \
+    --gradient_accumulation_steps 4 \
+    --dataset ${DATASET} \
+    --model_name ${MODEL_NAME} \
+    --model_nickname ${MODEL_NICKNAME} \
+    --output_dir ${OUTPUT_DIR} \
+    --lr 1e-5 \
+    --num_epochs 3 \
+    --weight_decay 0.1 \
+    --gamma 0.85 \
+    --seed 42 \
+    --save_model True
+```
 
-# Data flow
-Data in the \data repo but its path is instantiated in the \calyapo\configurations\config repo. 
+Key parameters to configure in the sbatch script before submission:
 
-clean_datasets --> turns it into jsons binding 
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `MODEL_NAME` | HuggingFace model identifier | `meta-llama/Llama-3.1-8B` |
+| `MODEL_NICKNAME` | Short name used for checkpoint naming | `llama3.1-8b` |
+| `DATASET` | Dataset config name | `opinion_school_dataset` |
+| `OUTPUT_DIR` | Checkpoint output path | `calyapo/training/checkpoints/${DATASET}` |
 
-# Quick Commands
-- Clean Dataset: python calyapo/data_preprocessing/clean_datasets.py
-- Split Data: python calyapo/data_preprocessing/data_combiner.py
-- Test Prompt Tokenizer: python calyapo/training/datasets/calyapo_dataset.py
-- Finetune: python -m calyapo.training.finetuning \
-    --dataset "ideology_to_trump_dataset" \
-    --run_validation True \
-    --save_model True \
-    --output_dir "calyapo/training/model_checkpoints"
+Model and training hyperparameters are configured in `training/configs/training.py` and can be overridden via sbatch arguments. See [Codebase Walkthrough](#codebase-walkthrough) for a detailed trace of the finetuning execution.
+
+---
+
+## Inference
+
+Inference jobs are submitted to Savio via SLURM:
+
+```bash
+sbatch scripts/experiment/inference.slurm
+```
+
+Or run directly:
+
+```bash
+python scripts/llm/offline_inf.py \
+    --train_plan=${TRAIN_PLAN} \
+    --model_name=${MODEL_NAME} \
+    --model_type=${MODEL_TYPE} \
+    --adapter_folder=${ADAPTER_FOLDER} \
+    --split=${SPLIT} \
+    --run_keyword=${RUN_KEYWORD} \
+    --num_gpus=1 \
+    --chunk_size=2000
+```
+
+Key parameters:
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `TRAIN_PLAN` | Name of the training plan to run inference on | `opinion_school` |
+| `MODEL_NAME` | HuggingFace model identifier | `meta-llama/Llama-3.1-8B` |
+| `MODEL_TYPE` | Whether to load the base or LoRA-finetuned model | `lora` or `base` |
+| `ADAPTER_FOLDER` | Name of the checkpoint folder under `training/checkpoints/` | `wdllama3.1-8b_wd0.1_gam0.85_lr1e-05_...` |
+| `SPLIT` | Dataset split to run inference on | `train`, `val`, or `test` |
+| `RUN_KEYWORD` | Tag for naming the output inference run | `archon` |
+
+---
+
+## Evaluation
+
+```bash
+# Generate summary tables
+python scripts/data_eval/table.py
+
+# Generate full evaluation report
+python scripts/data_eval/report.py
+```
+
+---
+
+## Repository Structure
+
+```
+calyapo/
+├── configurations/
+│   ├── config.py                  # Data path configuration
+│   ├── data_map_config.py
+│   └── data_mappings.py           # Variable label mappings
+├── data_preprocessing/
+│   ├── clean_datasets.py          # Raw → Intermediate
+│   ├── data_combiner.py           # Intermediate → Final splits
+│   └── generate_steering_prompts.py
+└── training/                      # LLaMA Cookbook clone
+    ├── configs/                   # Training and dataset configs
+    ├── datasets/                  # Dataset loader definitions
+    │   └── calyapo_dataset.py
+    ├── inference/
+    ├── model_checkpoints/
+    ├── utils/
+    │   ├── dataset_utils.py
+    │   └── train_utils.py
+    └── finetuning.py              # Main finetuning entrypoint
+
+data/
+├── raw/
+│   ├── anes/
+│   ├── ppic/
+│   └── igs/
+```
+
+---
+
+## Training Plans
+
+A Training Plan is a configuration object that specifies which demographic variables to include, which survey questions to train on, and how to split the data. Two Training Plans were used in this work:
+
+**`Opinion_School`** — used for Training Setting 1 (generalization to unseen individuals). Trains and validates on the same three favorability questions (Kamala Harris, Joe Biden, Donald Trump). Composed of 26,516 training, 7,576 validation, and 3,790 test datapoints.
+
+**`Presidents_to_Abortion`** — used for Training Setting 2 (generalization to unseen questions). Trains on Biden/Trump favorability responses and validates on abortion access opinion questions. Composed of 29,606 training, 3,792 validation, and 1,896 test datapoints.
+
+Training Plans are defined in `training/configs/datasets.py`. Each individual-question pair is encoded as a separate datapoint, so a single respondent who answers multiple survey questions contributes multiple entries to the dataset.
+
+---
+
+## Adding New Datasets
+
+1. Register the dataset config in `training/configs/datasets.py`
+2. Add the dataset loader mapping in `training/datasets/__init__.py`
+3. Implement a `get_<dataset>_dataset` function following the pattern in `training/datasets/calyapo_dataset.py`
+4. Place raw data files under the appropriate `data/raw/<source>/` directory and update path references in `calyapo/configurations/config.py`
+
+---
+
+## Codebase Walkthrough
+
+### Finetuning logic (`training/finetuning.py`)
+
+The finetuning script is invoked by `scripts/experiment/run_finetune.py` via a `fire` call from the sbatch script.
+
+Key execution steps:
+
+- **Lines 152**: A `config` object is instantiated from `train_config.model_name`; `train_config` is defined in `training/configs/training.py` and is partially overridden by sbatch arguments.
+- **Lines 153–197**: The `model` object is constructed based on `config.model_type`.
+- **Lines 328–342**: `get_preprocessed_dataset()` is called and returns the train/validation datasets.
+  - Defined in `training/utils/dataset_utils.py`
+  - Accepts a `dataset_config` (e.g. from `training/configs/datasets.py`)
+  - Uses `DATASET_PREPROC` in `training/datasets/__init__.py` to look up the appropriate loader by `dataset_config.dataset`
+  - Calls `get_calyapo_dataset()` (defined in `training/datasets/calyapo_dataset.py`) with the dataset config, tokenizer, and split path from `get_split()`
+- **Line 416**: `train()` is called, defined in `training/utils/train_utils.py`
+  - **Line 241 of `train_utils.py`**: `evaluation()` is called during the training loop
+
+---
+
+## Citation
+
+If you use CalYAPo in your research, please cite:
+
+```bibtex
+@thesis{ngai2025calyapo,
+  author = {Ngai, Jonathan},
+  title  = {[TODO: Thesis title]},
+  school = {University of California, Berkeley},
+  year   = {2025}
+}
+```

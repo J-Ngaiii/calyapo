@@ -1455,19 +1455,22 @@ class Reporter:
         using distributional accuracy metrics.
         """
 
-        metrics_path = (
-            self.results_folder
-            / "distributional_accuracy"
-            / "summary_demog_metrics.csv"
-        )
+        metrics_path = self.results_folder / Path("distributional_accuracy/summary_demog_metrics.csv")
+        granular_metrics_path = self.results_folder / Path("distributional_accuracy/aggregated_kl_metrics.csv") # it says kl but it includes wd that's my bad
 
         if not metrics_path.exists():
             raise FileNotFoundError(
                 "summary_demog_metrics.csv not found. "
                 "Run distributional_accuracy() first."
             )
+        if not granular_metrics_path.exists():
+            raise FileNotFoundError(
+                "aggregated_kl_metrics.csv not found. "
+                "Run distributional_accuracy() first."
+            )
 
         df = pd.read_csv(metrics_path)
+        gran_df = pd.read_csv(granular_metrics_path)
 
         self._best_model_plot(
             df=df,
@@ -1486,7 +1489,7 @@ class Reporter:
         )
 
         self._distribution_violinplot(
-            df=df,
+            df=gran_df,
             split=split,
             score=score,
             save_filename=f"{self.train_plan}_{score}_violin.png",
@@ -1494,9 +1497,276 @@ class Reporter:
         )
 
         self._distribution_pareto_plot(
-            df=df,
+            df=gran_df,
             split=split,
             score=score,
             save_filename=f"{self.train_plan}_{score}_pareto.png",
+            show=show_plots
+        )
+
+    # ----------------------------
+    # Metric Agreement Analysis
+    # ----------------------------
+    def _rank_scatter_plot(
+        self,
+        df: pd.DataFrame,
+        split: str,
+        save_filename: str = None,
+        show: bool = False
+    ):
+        """
+        Scatter plot of average KL rank vs average WD rank per model.
+        Points on the diagonal = metrics agree on model standing.
+        Points off diagonal = metric-sensitive ranking.
+        Size of point = number of demographics the model wins under either metric.
+        """
+        subdf = df[df['Split'] == split].copy()
+
+        # compute per-demographic ranks for each model
+        for metric in ['KL_Weighted', 'WD_Weighted']:
+            subdf[f'{metric}_rank'] = subdf.groupby('Demographic')[metric].rank(
+                ascending=True, method='min'
+            )
+
+        avg_ranks = (
+            subdf
+            .groupby('Model')[['KL_Weighted_rank', 'WD_Weighted_rank']]
+            .mean()
+            .reset_index()
+        )
+
+        # count demographics won under either metric
+        kl_wins = subdf.loc[subdf.groupby('Demographic')['KL_Weighted'].idxmin(), 'Model'].value_counts()
+        wd_wins = subdf.loc[subdf.groupby('Demographic')['WD_Weighted'].idxmin(), 'Model'].value_counts()
+        total_wins = kl_wins.add(wd_wins, fill_value=0).reset_index()
+        total_wins.columns = ['Model', 'wins']
+        avg_ranks = avg_ranks.merge(total_wins, on='Model', how='left').fillna({'wins': 0})
+
+        unique_models = avg_ranks['Model'].unique()
+        colors_palette = plt.cm.get_cmap('tab10', len(unique_models))
+        model_color_map = {m: colors_palette(i) for i, m in enumerate(unique_models)}
+
+        sns.set_style("whitegrid")
+        plt.figure(figsize=(9, 7))
+
+        for _, row in avg_ranks.iterrows():
+            plt.scatter(
+                row['KL_Weighted_rank'],
+                row['WD_Weighted_rank'],
+                color=model_color_map[row['Model']],
+                s=100 + row['wins'] * 40,
+                edgecolors='black',
+                linewidths=0.5,
+                zorder=3
+            )
+            plt.text(
+                row['KL_Weighted_rank'] + 0.05,
+                row['WD_Weighted_rank'] + 0.05,
+                row['Model'],
+                fontsize=7,
+                ha='left',
+                va='bottom'
+            )
+
+        # diagonal = perfect agreement
+        lims = [1, len(unique_models)]
+        plt.plot(lims, lims, linestyle='--', color='gray', linewidth=1, label='Perfect agreement')
+
+        plt.xlabel('Average KL Divergence Rank (lower = better)', fontsize=11)
+        plt.ylabel('Average WD Rank (lower = better)', fontsize=11)
+        plt.title(
+            f'KL vs WD Model Rankings ({split.capitalize()} Set)\n'
+            f'Point size = total demographic wins across both metrics',
+            fontsize=12
+        )
+        plt.legend(fontsize=9)
+        plt.tight_layout()
+
+        if save_filename:
+            folder_path = Path(f"{self.graphs_folder}/{split}")
+            folder_path.mkdir(parents=True, exist_ok=True)
+            save_path = folder_path / save_filename
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            if self.verbose:
+                print(f"Saved rank scatter to: {save_path}")
+
+        if show:
+            plt.show()
+
+        plt.close()
+
+
+    def _alluvial_plot(
+        self,
+        df: pd.DataFrame,
+        split: str,
+        save_filename: str = None,
+        show: bool = False
+    ):
+        """
+        Alluvial/flow diagram comparing best model per demographic
+        under KL Divergence vs Wasserstein Distance.
+        Each demographic is a row. Left column = KL best model,
+        right column = WD best model. Crossing bands = metric disagreement.
+        """
+        subdf = df[df['Split'] == split].copy()
+
+        kl_best = (
+            subdf
+            .loc[subdf.groupby('Demographic')['KL_Weighted'].idxmin()]
+            [['Demographic', 'Model']]
+            .rename(columns={'Model': 'KL_Best'})
+        )
+        wd_best = (
+            subdf
+            .loc[subdf.groupby('Demographic')['WD_Weighted'].idxmin()]
+            [['Demographic', 'Model']]
+            .rename(columns={'Model': 'WD_Best'})
+        )
+        flow_df = kl_best.merge(wd_best, on='Demographic').reset_index(drop=True)
+
+        demographics = flow_df['Demographic'].tolist()
+        n = len(demographics)
+
+        unique_models = sorted(
+            set(flow_df['KL_Best'].tolist() + flow_df['WD_Best'].tolist())
+        )
+        colors_palette = plt.cm.get_cmap('tab10', len(unique_models))
+        model_color_map = {m: colors_palette(i) for i, m in enumerate(unique_models)}
+
+        fig, ax = plt.subplots(figsize=(11, max(6, n * 0.9)))
+
+        y_positions = {d: (n - 1 - i) for i, d in enumerate(demographics)}
+
+        bar_width = 0.08
+        left_x = 0.2
+        right_x = 0.8
+
+        for demog, y in y_positions.items():
+            row = flow_df[flow_df['Demographic'] == demog].iloc[0]
+            kl_model = row['KL_Best']
+            wd_model = row['WD_Best']
+            agrees = kl_model == wd_model
+
+            band_color = model_color_map[kl_model]
+            alpha = 0.5 if agrees else 0.35
+
+            # control points for smooth cubic bezier band
+            band_height = 0.3
+            xs = np.linspace(left_x + bar_width, right_x, 100)
+            t = (xs - (left_x + bar_width)) / (right_x - (left_x + bar_width))
+            y_left = y
+            y_right = y_positions[demog]  # same row, but visually connects models
+
+            y_top = (1 - t)**3 * (y_left + band_height/2) + 3*(1-t)**2*t * (y_left + band_height/2) + \
+                    3*(1-t)*t**2 * (y_right + band_height/2) + t**3 * (y_right + band_height/2)
+            y_bot = (1 - t)**3 * (y_left - band_height/2) + 3*(1-t)**2*t * (y_left - band_height/2) + \
+                    3*(1-t)*t**2 * (y_right - band_height/2) + t**3 * (y_right - band_height/2)
+
+            ax.fill_between(xs, y_bot, y_top, color=band_color, alpha=alpha)
+
+            # left node (KL best)
+            ax.barh(y, bar_width, left=left_x, height=0.5,
+                    color=model_color_map[kl_model], edgecolor='black', linewidth=0.5)
+
+            # right node (WD best)
+            ax.barh(y, bar_width, left=right_x, height=0.5,
+                    color=model_color_map[wd_model], edgecolor='black', linewidth=0.5)
+
+            # disagreement marker
+            if not agrees:
+                ax.text(
+                    0.5, y + 0.28,
+                    '✗',
+                    ha='center', va='bottom',
+                    fontsize=10, color='firebrick', fontweight='bold'
+                )
+
+            # demographic label center
+            ax.text(0.5, y, demog, ha='center', va='center', fontsize=9, fontweight='500')
+
+            # model name labels
+            ax.text(left_x - 0.01, y, kl_model, ha='right', va='center', fontsize=7)
+            ax.text(right_x + bar_width + 0.01, y, wd_model, ha='left', va='center', fontsize=7)
+
+        # column headers
+        ax.text(left_x + bar_width/2, n, 'KL Divergence\nBest Model',
+                ha='center', va='bottom', fontsize=10, fontweight='bold')
+        ax.text(right_x + bar_width/2, n, 'Wasserstein Distance\nBest Model',
+                ha='center', va='bottom', fontsize=10, fontweight='bold')
+
+        # legend
+        handles = [
+            Patch(facecolor=model_color_map[m], label=m, edgecolor='black', linewidth=0.5)
+            for m in unique_models
+        ]
+        ax.legend(
+            handles=handles, title='Model', loc='lower center',
+            bbox_to_anchor=(0.5, -0.12), ncol=2,
+            prop={'size': 8}, title_fontsize=9
+        )
+
+        ax.set_xlim(0, 1.1)
+        ax.set_ylim(-0.8, n + 0.3)
+        ax.axis('off')
+        ax.set_title(
+            f'Best Model per Demographic: KL vs WD Agreement ({split.capitalize()} Set)\n'
+            f'✗ = metric disagreement',
+            fontsize=12, pad=12
+        )
+
+        plt.tight_layout()
+
+        if save_filename:
+            folder_path = Path(f"{self.graphs_folder}/{split}")
+            folder_path.mkdir(parents=True, exist_ok=True)
+            save_path = folder_path / save_filename
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            if self.verbose:
+                print(f"Saved alluvial plot to: {save_path}")
+
+        if show:
+            plt.show()
+
+        plt.close()
+
+
+    def metric_agreement_analysis(
+        self,
+        split: str = 'test',
+        show_plots: bool = False
+    ):
+        """
+        Generates:
+        - Rank scatter plot (KL rank vs WD rank per model)
+        - Alluvial flow diagram (best model per demographic under KL vs WD)
+
+        Requires distributional_accuracy() to have been run first.
+        """
+        metrics_path = (
+            self.results_folder
+            / 'distributional_accuracy'
+            / 'summary_demog_metrics.csv'
+        )
+
+        if not metrics_path.exists():
+            raise FileNotFoundError(
+                "summary_demog_metrics.csv not found. "
+                "Run distributional_accuracy() first."
+            )
+
+        df = pd.read_csv(metrics_path)
+
+        self._rank_scatter_plot(
+            df=df,
+            split=split,
+            save_filename=f"{self.train_plan}_kl_vs_wd_rank_scatter.png",
+            show=show_plots
+        )
+
+        self._alluvial_plot(
+            df=df,
+            split=split,
+            save_filename=f"{self.train_plan}_kl_vs_wd_alluvial.png",
             show=show_plots
         )
