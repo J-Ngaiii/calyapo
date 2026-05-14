@@ -59,14 +59,15 @@ def main():
         # rep.generate_geographic_reports(split='test', train_setting=TRAIN_SETTING) # deprecated for now
         # print(f"Step 5 (Geographic Analysis) Complete!")
 
-
+        print(f"Beginning Step 6 (Prediction Stacked Bar Analysis)...\n")
         rep.prediction_distribution_analysis(split='test')
         print(f"\nStep 6 (Prediction Stacked Bar Analysis) Complete!\n")
 
+        print(f"Beginning Step 7 (Distribution Alignment Plots)...\n")
         alignment_metrics = ['KL_Weighted', 'WD_Weighted', 'TV_Weighted']
         for metric in alignment_metrics:
             rep.distributional_alignment_analysis(split='test', score=metric)
-        print(f"Step 7 (Distribution Alignment Plots) Complete!")
+        print(f"\nStep 7 (Distribution Alignment Plots) Complete!\n")
 
         return # exit after
    
