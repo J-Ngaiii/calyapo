@@ -48,15 +48,22 @@ if [ -f .env ]; then
   export $(grep -v '^#' .env | xargs)
 fi
 
+# --- Storage Redirection ---
+# Redirecting cache to scratch to avoid Home quota issues
+export HF_HOME="/global/scratch/users/jonathanngai/hf_cache"
+export TORCH_HOME="/global/scratch/users/jonathanngai/torch_cache"
+mkdir -p $HF_HOME
+mkdir -p $TORCH_HOME
+
 # Distributed Setup
 NPROC_PER_NODE=1                     
 MASTER_PORT=$(expr 10000 + $(echo -n $SLURM_JOBID | tail -c 4)) # Random port to avoid collisions
 
 # Model/Data Params for opinion_school
 TRAIN_PLAN="presidents_to_abortion"
-# MODEL_NAME="meta-llama/Llama-3.1-8B"
-# MODEL_NICKNAME="llama3.1-8b"
-# ADAPTER_FOLDER="wdllama3.1-8b_wd0.1_gam0.85_lr1e-05_2026-05-03-06-47-00AM"
+MODEL_NAME="meta-llama/Llama-3.1-8B"
+MODEL_NICKNAME="llama3.1-8b"
+ADAPTER_FOLDER="wdllama3.1-8b_wd0.1_gam0.85_lr1e-05_2026-05-03-06-47-00AM"
 
 # MODEL_NAME="meta-llama/Llama-3.1-8B-Instruct"
 # MODEL_NICKNAME="llama3.1-8b-Instruct" 
@@ -82,15 +89,15 @@ TRAIN_PLAN="presidents_to_abortion"
 # MODEL_NICKNAME="qwen2.5-14b"
 # ADAPTER_FOLDER="wdqwen2.5-14b_wd0.1_gam0.85_lr1e-05_2026-05-03-11-08-16AM"
 
-MODEL_NAME="Qwen/Qwen2.5-14B-Instruct"
-MODEL_NICKNAME="qwen2.5-14b-Instruct"
-ADAPTER_FOLDER="wdqwen2.5-14b-Instruct_wd0.1_gam0.85_lr1e-05_2026-05-03-11-19-09AM"
+# MODEL_NAME="Qwen/Qwen2.5-14B-Instruct"
+# MODEL_NICKNAME="qwen2.5-14b-Instruct"
+# ADAPTER_FOLDER="wdqwen2.5-14b-Instruct_wd0.1_gam0.85_lr1e-05_2026-05-03-11-19-09AM"
 
 MODEL_TYPE="base" 
 # MODEL_TYPE="lora" 
-SPLIT="train"
+# SPLIT="train"
 # SPLIT="val"
-# SPLIT="test"
+SPLIT="test"
 
 RUN_KEYWORD="archon"
 NUM_GPUS=1

@@ -195,7 +195,7 @@ def run_inference(engine_params, sampling_params, split, train_plan, input_path,
     print("Starting batch inference...")
     if engine_params.get('enable_lora', False):
         if not os.path.exists(lora_path):
-            raise f"LoRA is enabled but inputted LoRA path '{lora_path}' does not exist"
+            raise ValueError(f"LoRA is enabled but inputted LoRA path '{lora_path}' does not exist")
         print("LoRA model detected")
         lora_request = LoRARequest("my_finetuned_model", 1, lora_path)
     else:
