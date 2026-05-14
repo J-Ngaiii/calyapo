@@ -4,9 +4,7 @@ import ast
 import pandas as pd
 import numpy as np
 from pathlib import Path
-from typing import List, Dict, Union
-from calyapo.configurations.config import UNIVERSAL_FINAL_FOLDER
-from calyapo.utils import file_saver
+from typing import Dict
 
 class Tabularizer:
     def __init__(self, train_plan: str, keyword: str, root_path: str = ".", debug: bool = False, verbose = False):

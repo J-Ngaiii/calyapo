@@ -134,7 +134,7 @@ def split_combine(
             indiv_map: List[Dict] = inpack.get(split)
             data, meta = flatten_data_to_llama_format(indiv_map, split)
             data_dict[split].extend(data)
-            meta_dict[split].extend(data)
+            meta_dict[split].extend(meta)
 
             if save:
                 assert out_path is not None, f"(split_combine | WARNING) Cannot have no out_path if saving."

@@ -17,7 +17,6 @@ def main():
     parser.add_argument("--only_pred", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--only_distrib", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--only_dist_align", action=argparse.BooleanOptionalAction, default=False)
-    parser.add_argument("--only_metric_consistency", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--full_analysis", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--verbose", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--debug", action=argparse.BooleanOptionalAction, default=True)
@@ -40,15 +39,34 @@ def main():
 
 
     if args.full_analysis:
+        # generates all files that shows up in paper, we only look at test set for some plots
+        print(f"\nBeginning Step 1 (Accuracy Plots)...\n")
         rep.accuracy()
-        rep.generate_crosstabs()
-        rep.confidence_analysis()
-        rep.distributional_accuracy(demog_col_indices=[0])
-       
-        for split in ['train', 'val', 'test']:
-            rep.generate_geographic_reports(split=split, train_setting=TRAIN_SETTING)
-            rep.prediction_distribution_analysis(split=args.split)
+        print(f"\nStep 1 (Accuracy Plots) Complete!\n")
 
+        print(f"Beginning Step 2 (Demographic Crosstab Generation)...\n")
+        rep.generate_crosstabs()
+        print(f"\nStep 2 (Demographic Crosstab Generation) Complete!\n")
+
+        print(f"Beginning Step 3 (Confidence and Calibration Generation)...\n")
+        rep.confidence_analysis(split='test')
+        print(f"\nStep 3 (Confidence and Calibration Generation) Complete!\n")
+
+        print(f"Beginning Step 4 (Distribution Alignment Metric Calculations)...\n")
+        rep.distributional_accuracy(demog_col_indices=[0])
+        print(f"\nStep 4 (Distribution Alignment Metric Calculations) Complete!\n")
+       
+        # rep.generate_geographic_reports(split='test', train_setting=TRAIN_SETTING) # deprecated for now
+        # print(f"Step 5 (Geographic Analysis) Complete!")
+
+
+        rep.prediction_distribution_analysis(split='test')
+        print(f"\nStep 6 (Prediction Stacked Bar Analysis) Complete!\n")
+
+        alignment_metrics = ['KL_Weighted', 'WD_Weighted', 'TV_Weighted']
+        for metric in alignment_metrics:
+            rep.distributional_alignment_analysis(split='test', score=metric)
+        print(f"Step 7 (Distribution Alignment Plots) Complete!")
 
         return # exit after
    
@@ -72,8 +90,6 @@ def main():
         alignment_metrics = ['KL_Weighted', 'WD_Weighted', 'TV_Weighted']
         for metric in alignment_metrics:
             rep.distributional_alignment_analysis(split=args.split, score=metric)
-    if args.only_metric_consistency:
-        rep.metric_agreement_analysis(split=args.split)
 
 
 if __name__ == "__main__":

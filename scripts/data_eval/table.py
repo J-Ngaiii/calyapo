@@ -1,6 +1,4 @@
 import argparse
-import sys
-import json
 from pathlib import Path
 from calyapo.data_eval.tabularizer import Tabularizer
 
@@ -13,7 +11,7 @@ def main():
     args = parser.parse_args()
 
     LLAMA_SUBFOLDER = "meta-llama"
-    QWEN_SUBFOLDER = "qwen"
+    QWEN_SUBFOLDER = "Qwen"
     LLAMA_MODELS_FINETUNED = [
         'Llama-3.1-8B', 
         'Llama-3.1-8B-Instruct', 
@@ -21,7 +19,8 @@ def main():
         'Llama-3.2-3B-Instruct', 
     ]
     QWEN_MODELS_FINETUNED = [
-        'Qwen2.5-'
+        'Qwen2.5-7B', 
+        'Qwen2.5-7B-Instruct', 
         'Qwen2.5-14B', 
         'Qwen2.5-14B-Instruct' 
     ]

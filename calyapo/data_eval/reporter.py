@@ -267,9 +267,12 @@ class Reporter:
 
         for split, df in tqdm(tabs.items(), desc='Generating crosstabs on train, val and test data.'):
             # Identify demographics dynamically
-            exclude = ['dataset_date', 'time_period', 'dataset',  'weight', 'topic', 'true_answer', 'Question', 'index', 'uniqueid', 'id'] + \
-                      [c for c in df.columns if c.endswith('_correct') or c.endswith('_pred')]
+            exclude = ['dataset_date', 'time_period', 'dataset',  'weight', 'topic', 'true_answer', 'Question', 'index', 'uniqueid', 'id', 'prompt', 'completion'] + \
+                      [c for c in df.columns if c.endswith('_correct') or c.endswith('_pred') or c.endswith('top_logprob') or c.endswith('top2_diff') or c.endswith('top5_sd')]
             demog_cols = [c for c in df.columns if c not in exclude and not c.startswith('Unnamed')]
+
+            if len(demog_cols) != 8:
+                print(f"(generate_crosstabs | reporter) Warning: Calyapo Thesis only uses eight demographic variables, currently detecting {len(demog_cols)} demographic variables.")
 
             if self.debug:
                 # print(f"( generate_crosstab | Reporter) demog_cols extracted {demog_cols}") 
@@ -321,10 +324,11 @@ class Reporter:
 
     def distributional_accuracy(self, demog_col_indices: List[int] = [0]):
         """
-        Calculates KL and WD for both Weighted and Unweighted distributions
+        Calculates KL, TVD and WD for both Weighted and Unweighted distributions
         by comparing True survey distributions against Model prediction distributions.
         """
-        if self.verbose: print(f"Calculating Distributional Accuracy (KL/WD/TV)...")
+        if self.verbose: 
+            print(f"Calculating Distributional Accuracy (KL/WD/TV)...")
         
         crosstab_root = self.results_folder / "crosstabs"
         csv_files = list(crosstab_root.glob("**/*_comparison.csv"))
@@ -767,9 +771,12 @@ class Reporter:
         families = {
             "llama3.1": df[df["Model"].str.contains("llama-3.1", case=False)],
             "llama3.2": df[df["Model"].str.contains("llama-3.2", case=False)],
-            "qwen7b": df[df["Model"].str.contains("qwen-2.5-7b", case=False)],
-            "qwen14b": df[df["Model"].str.contains("qwen-2.5-14b", case=False)],
+            "qwen7b": df[df["Model"].str.contains("qwen2.5-7b", case=False)],
+            "qwen14b": df[df["Model"].str.contains("qwen2.5-14b", case=False)],
         }
+
+        if self.debug:
+            print(f"(_calib_by_fam | reporter) available models: {df["Model"].unique()}")
 
 
         for fam_name, subdf in families.items():
@@ -908,19 +915,10 @@ class Reporter:
         granular: bool = True,
     ):
         """
-        Creates a normalized stacked bar chart showing
-        prediction distributions for every model
-        (base + lora).
-
-        Parameters
-        ----------
-        granular : bool
-            If True:
-                - Each response choice gets its own shade
-                (multiple greens/reds).
-            If False:
-                - Only two categories are shown:
-                Valid (green) vs Invalid (red).
+        Creates a normalized stacked bar chart showing prediction distributions.
+        
+        If granular=True, the legend shows every unique raw output token.
+        If granular=False, the legend only shows 'Valid' vs 'Invalid'.
         """
 
         if split not in tabulars_dict:
@@ -932,211 +930,99 @@ class Reporter:
         if len(pred_cols) == 0:
             raise ValueError("No *_pred columns found.")
 
+        # Collect all unique tokens across all models
         all_answers = sorted(
             pd.unique(
                 pd.concat(
-                    [df[col].dropna() for col in pred_cols],
+                    [df[col].dropna().astype(str) for col in pred_cols],
                     ignore_index=True
                 )
             )
         )
 
-        # Optional: enforce Likert ordering
+        # Standardize Likert order for consistency
         likert_order = ["A", "B", "C", "D", "E"]
-
         if set(likert_order).issuperset(set(all_answers)):
             all_answers = [x for x in likert_order if x in all_answers]
 
         dist_rows = []
-
         for col in pred_cols:
             counts = (
                 df[col]
+                .astype(str)
                 .value_counts(normalize=True)
                 .reindex(all_answers, fill_value=0)
             )
-
             row = {"Model": col.replace("_pred", "")}
-
             for ans in all_answers:
                 row[ans] = counts[ans]
-
             dist_rows.append(row)
 
         dist_df = pd.DataFrame(dist_rows)
+        dist_df["TypeOrder"] = dist_df["Model"].apply(lambda x: 0 if "base" in x.lower() else 1)
+        dist_df = dist_df.sort_values(["TypeOrder", "Model"]).drop(columns="TypeOrder")
 
-        # Sort base models first
-        dist_df["TypeOrder"] = dist_df["Model"].apply(
-            lambda x: 0 if "base" in x.lower() else 1
-        )
-
-        dist_df = (
-            dist_df
-            .sort_values(["TypeOrder", "Model"])
-            .drop(columns="TypeOrder")
-        )
-
-        # Define valid responses
-        valid_answers = {
-            "A", "A.",
-            "B", "B.",
-            "C", "C.",
-            "D", "D.",
-            "E", "E."
-        }
-
+        # Mapping logic for Valid (Standard survey responses) vs Invalid
+        valid_answers = {"A", "A.", "B", "B.", "C", "C.", "D", "D.", "E", "E."}
         valid_cols = [a for a in all_answers if a in valid_answers]
         invalid_cols = [a for a in all_answers if a not in valid_answers]
 
         sns.set_style("whitegrid")
-
         fig, ax = plt.subplots(figsize=(18, 8))
-
         bottom = np.zeros(len(dist_df))
+        legend_handles = []
 
         if granular:
-
-            green_palette = sns.color_palette(
-                "Greens",
-                n_colors=max(len(valid_cols) + 2, 3)
-            )[2:]
-
-            red_palette = sns.color_palette(
-                "Reds",
-                n_colors=max(len(invalid_cols) + 2, 3)
-            )[2:]
+            # Create distinct color gradients for each individual token
+            green_palette = sns.color_palette("Greens", n_colors=max(len(valid_cols) + 2, 3))[2:]
+            red_palette = sns.color_palette("Reds", n_colors=max(len(invalid_cols) + 2, 3))[2:]
 
             color_map = {}
-
-            for ans, color in zip(valid_cols, green_palette):
+            # Plot Valid tokens and add to legend
+            for i, ans in enumerate(valid_cols):
+                color = green_palette[i % len(green_palette)]
                 color_map[ans] = color
-
-            for ans, color in zip(invalid_cols, red_palette):
-                color_map[ans] = color
-
-            ordered_answers = valid_cols + invalid_cols
-
-            for ans in ordered_answers:
-
                 vals = dist_df[ans].values
-
-                ax.bar(
-                    dist_df["Model"],
-                    vals,
-                    bottom=bottom,
-                    color=color_map[ans],
-                    edgecolor="white",
-                    linewidth=0.5
-                )
-
+                ax.bar(dist_df["Model"], vals, bottom=bottom, color=color, edgecolor="white", linewidth=0.5)
                 bottom += vals
+                legend_handles.append(Patch(facecolor=color, label=f"Valid: {ans}"))
 
-            legend_handles = []
-
-            if len(valid_cols) > 0:
-                legend_handles.append(
-                    Patch(
-                        facecolor=green_palette[-1],
-                        label="Valid"
-                    )
-                )
-
-            if len(invalid_cols) > 0:
-                legend_handles.append(
-                    Patch(
-                        facecolor=red_palette[-1],
-                        label="Invalid"
-                    )
-                )
-
+            # Plot Invalid tokens and add to legend
+            for i, ans in enumerate(invalid_cols):
+                color = red_palette[i % len(red_palette)]
+                color_map[ans] = color
+                vals = dist_df[ans].values
+                ax.bar(dist_df["Model"], vals, bottom=bottom, color=color, edgecolor="white", linewidth=0.5)
+                bottom += vals
+                legend_handles.append(Patch(facecolor=color, label=f"Invalid: {ans}"))
         else:
-
+            # Simplified version: Only two categories in legend
             valid_vals = dist_df[valid_cols].sum(axis=1).values
             invalid_vals = dist_df[invalid_cols].sum(axis=1).values
 
-            valid_color = "forestgreen"
-            invalid_color = "firebrick"
-
-            ax.bar(
-                dist_df["Model"],
-                valid_vals,
-                bottom=bottom,
-                color=valid_color,
-                edgecolor="white",
-                linewidth=0.5,
-                label="Valid"
-            )
-
+            ax.bar(dist_df["Model"], valid_vals, bottom=bottom, color="forestgreen", edgecolor="white", linewidth=0.5)
             bottom += valid_vals
-
-            ax.bar(
-                dist_df["Model"],
-                invalid_vals,
-                bottom=bottom,
-                color=invalid_color,
-                edgecolor="white",
-                linewidth=0.5,
-                label="Invalid"
-            )
-
+            ax.bar(dist_df["Model"], invalid_vals, bottom=bottom, color="firebrick", edgecolor="white", linewidth=0.5)
+            
             legend_handles = [
-                Patch(facecolor=valid_color, label="Valid"),
-                Patch(facecolor=invalid_color, label="Invalid")
+                Patch(facecolor="forestgreen", label="Valid Responses"),
+                Patch(facecolor="firebrick", label="Invalid/Collapsed Responses")
             ]
 
         ax.set_ylim(0, 1)
-
-        ax.set_ylabel("Prediction Proportion")
-        ax.set_xlabel("Model")
-
-        title_suffix = (
-            "Granular"
-            if granular
-            else "General"
-        )
-
-        ax.set_title(
-            f"{title_suffix} Prediction Distributions "
-            f"({split.capitalize()} Set)"
-        )
-
+        ax.set_ylabel("Proportion of Predictions")
+        ax.set_title(f"{'Granular' if granular else 'General'} Output Distribution ({split.capitalize()})")
         plt.xticks(rotation=45, ha="right")
-
-        ax.legend(
-            handles=legend_handles,
-            title="Prediction Type",
-            bbox_to_anchor=(1.02, 1),
-            loc="upper left"
-        )
+        
+        # Place legend outside to handle long lists of raw tokens
+        ax.legend(handles=legend_handles, title="Legend", bbox_to_anchor=(1.01, 1), loc="upper left", fontsize='small')
 
         plt.tight_layout()
-
         if save_filename:
-
-            self.results_folder.mkdir(
-                parents=True,
-                exist_ok=True
-            )
-
-            save_path = (
-                self.results_folder / save_filename
-            )
-
-            plt.savefig(
-                save_path,
-                dpi=300,
-                bbox_inches="tight"
-            )
-
-            if self.verbose:
-                print(
-                    f"Saved prediction distribution plot to: "
-                    f"{save_path}"
-                )
-
+            self.results_folder.mkdir(parents=True, exist_ok=True)
+            plt.savefig(self.results_folder / save_filename, dpi=300, bbox_inches="tight")
         if show:
             plt.show()
-
         plt.close()
 
 
@@ -1615,272 +1501,5 @@ class Reporter:
             split=split,
             score=score,
             save_filename=f"{self.train_plan}_{score}_pareto.png",
-            show=show_plots
-        )
-
-    # ----------------------------
-    # Metric Agreement Analysis
-    # ----------------------------
-    def _rank_scatter_plot(
-        self,
-        df: pd.DataFrame,
-        split: str,
-        save_filename: str = None,
-        show: bool = False
-    ):
-        """
-        Scatter plot of average KL rank vs average WD rank per model.
-        Points on the diagonal = metrics agree on model standing.
-        Points off diagonal = metric-sensitive ranking.
-        Size of point = number of demographics the model wins under either metric.
-        """
-        subdf = df[df['Split'] == split].copy()
-
-        # compute per-demographic ranks for each model
-        for metric in ['KL_Weighted', 'WD_Weighted']:
-            subdf[f'{metric}_rank'] = subdf.groupby('Demographic')[metric].rank(
-                ascending=True, method='min'
-            )
-
-        avg_ranks = (
-            subdf
-            .groupby('Model')[['KL_Weighted_rank', 'WD_Weighted_rank']]
-            .mean()
-            .reset_index()
-        )
-
-        # count demographics won under either metric
-        kl_wins = subdf.loc[subdf.groupby('Demographic')['KL_Weighted'].idxmin(), 'Model'].value_counts()
-        wd_wins = subdf.loc[subdf.groupby('Demographic')['WD_Weighted'].idxmin(), 'Model'].value_counts()
-        total_wins = kl_wins.add(wd_wins, fill_value=0).reset_index()
-        total_wins.columns = ['Model', 'wins']
-        avg_ranks = avg_ranks.merge(total_wins, on='Model', how='left').fillna({'wins': 0})
-
-        unique_models = avg_ranks['Model'].unique()
-        colors_palette = plt.cm.get_cmap('tab10', len(unique_models))
-        model_color_map = {m: colors_palette(i) for i, m in enumerate(unique_models)}
-
-        sns.set_style("whitegrid")
-        plt.figure(figsize=(9, 7))
-
-        for _, row in avg_ranks.iterrows():
-            plt.scatter(
-                row['KL_Weighted_rank'],
-                row['WD_Weighted_rank'],
-                color=model_color_map[row['Model']],
-                s=100 + row['wins'] * 40,
-                edgecolors='black',
-                linewidths=0.5,
-                zorder=3
-            )
-            plt.text(
-                row['KL_Weighted_rank'] + 0.05,
-                row['WD_Weighted_rank'] + 0.05,
-                row['Model'],
-                fontsize=7,
-                ha='left',
-                va='bottom'
-            )
-
-        # diagonal = perfect agreement
-        lims = [1, len(unique_models)]
-        plt.plot(lims, lims, linestyle='--', color='gray', linewidth=1, label='Perfect agreement')
-
-        plt.xlabel('Average KL Divergence Rank (lower = better)', fontsize=11)
-        plt.ylabel('Average WD Rank (lower = better)', fontsize=11)
-        plt.title(
-            f'KL vs WD Model Rankings ({split.capitalize()} Set)\n'
-            f'Point size = total demographic wins across both metrics',
-            fontsize=12
-        )
-        plt.legend(fontsize=9)
-        plt.tight_layout()
-
-        if save_filename:
-            folder_path = Path(f"{self.graphs_folder}/{split}")
-            folder_path.mkdir(parents=True, exist_ok=True)
-            save_path = folder_path / save_filename
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            if self.verbose:
-                print(f"Saved rank scatter to: {save_path}")
-
-        if show:
-            plt.show()
-
-        plt.close()
-
-
-    def _alluvial_plot(
-        self,
-        df: pd.DataFrame,
-        split: str,
-        save_filename: str = None,
-        show: bool = False
-    ):
-        """
-        Alluvial/flow diagram comparing best model per demographic
-        under KL Divergence vs Wasserstein Distance.
-        Each demographic is a row. Left column = KL best model,
-        right column = WD best model. Crossing bands = metric disagreement.
-        """
-        subdf = df[df['Split'] == split].copy()
-
-        kl_best = (
-            subdf
-            .loc[subdf.groupby('Demographic')['KL_Weighted'].idxmin()]
-            [['Demographic', 'Model']]
-            .rename(columns={'Model': 'KL_Best'})
-        )
-        wd_best = (
-            subdf
-            .loc[subdf.groupby('Demographic')['WD_Weighted'].idxmin()]
-            [['Demographic', 'Model']]
-            .rename(columns={'Model': 'WD_Best'})
-        )
-        flow_df = kl_best.merge(wd_best, on='Demographic').reset_index(drop=True)
-
-        demographics = flow_df['Demographic'].tolist()
-        n = len(demographics)
-
-        unique_models = sorted(
-            set(flow_df['KL_Best'].tolist() + flow_df['WD_Best'].tolist())
-        )
-        colors_palette = plt.cm.get_cmap('tab10', len(unique_models))
-        model_color_map = {m: colors_palette(i) for i, m in enumerate(unique_models)}
-
-        fig, ax = plt.subplots(figsize=(11, max(6, n * 0.9)))
-
-        y_positions = {d: (n - 1 - i) for i, d in enumerate(demographics)}
-
-        bar_width = 0.08
-        left_x = 0.2
-        right_x = 0.8
-
-        for demog, y in y_positions.items():
-            row = flow_df[flow_df['Demographic'] == demog].iloc[0]
-            kl_model = row['KL_Best']
-            wd_model = row['WD_Best']
-            agrees = kl_model == wd_model
-
-            band_color = model_color_map[kl_model]
-            alpha = 0.5 if agrees else 0.35
-
-            # control points for smooth cubic bezier band
-            band_height = 0.3
-            xs = np.linspace(left_x + bar_width, right_x, 100)
-            t = (xs - (left_x + bar_width)) / (right_x - (left_x + bar_width))
-            y_left = y
-            y_right = y_positions[demog]  # same row, but visually connects models
-
-            y_top = (1 - t)**3 * (y_left + band_height/2) + 3*(1-t)**2*t * (y_left + band_height/2) + \
-                    3*(1-t)*t**2 * (y_right + band_height/2) + t**3 * (y_right + band_height/2)
-            y_bot = (1 - t)**3 * (y_left - band_height/2) + 3*(1-t)**2*t * (y_left - band_height/2) + \
-                    3*(1-t)*t**2 * (y_right - band_height/2) + t**3 * (y_right - band_height/2)
-
-            ax.fill_between(xs, y_bot, y_top, color=band_color, alpha=alpha)
-
-            # left node (KL best)
-            ax.barh(y, bar_width, left=left_x, height=0.5,
-                    color=model_color_map[kl_model], edgecolor='black', linewidth=0.5)
-
-            # right node (WD best)
-            ax.barh(y, bar_width, left=right_x, height=0.5,
-                    color=model_color_map[wd_model], edgecolor='black', linewidth=0.5)
-
-            # disagreement marker
-            if not agrees:
-                ax.text(
-                    0.5, y + 0.28,
-                    '✗',
-                    ha='center', va='bottom',
-                    fontsize=10, color='firebrick', fontweight='bold'
-                )
-
-            # demographic label center
-            ax.text(0.5, y, demog, ha='center', va='center', fontsize=9, fontweight='500')
-
-            # model name labels
-            ax.text(left_x - 0.01, y, kl_model, ha='right', va='center', fontsize=7)
-            ax.text(right_x + bar_width + 0.01, y, wd_model, ha='left', va='center', fontsize=7)
-
-        # column headers
-        ax.text(left_x + bar_width/2, n, 'KL Divergence\nBest Model',
-                ha='center', va='bottom', fontsize=10, fontweight='bold')
-        ax.text(right_x + bar_width/2, n, 'Wasserstein Distance\nBest Model',
-                ha='center', va='bottom', fontsize=10, fontweight='bold')
-
-        # legend
-        handles = [
-            Patch(facecolor=model_color_map[m], label=m, edgecolor='black', linewidth=0.5)
-            for m in unique_models
-        ]
-        ax.legend(
-            handles=handles, title='Model', loc='lower center',
-            bbox_to_anchor=(0.5, -0.12), ncol=2,
-            prop={'size': 8}, title_fontsize=9
-        )
-
-        ax.set_xlim(0, 1.1)
-        ax.set_ylim(-0.8, n + 0.3)
-        ax.axis('off')
-        ax.set_title(
-            f'Best Model per Demographic: KL vs WD Agreement ({split.capitalize()} Set)\n'
-            f'✗ = metric disagreement',
-            fontsize=12, pad=12
-        )
-
-        plt.tight_layout()
-
-        if save_filename:
-            folder_path = Path(f"{self.graphs_folder}/{split}")
-            folder_path.mkdir(parents=True, exist_ok=True)
-            save_path = folder_path / save_filename
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            if self.verbose:
-                print(f"Saved alluvial plot to: {save_path}")
-
-        if show:
-            plt.show()
-
-        plt.close()
-
-
-    def metric_agreement_analysis(
-        self,
-        split: str = 'test',
-        show_plots: bool = False
-    ):
-        """
-        Generates:
-        - Rank scatter plot (KL rank vs WD rank per model)
-        - Alluvial flow diagram (best model per demographic under KL vs WD)
-
-        Requires distributional_accuracy() to have been run first.
-        """
-        metrics_path = (
-            self.results_folder
-            / 'distributional_accuracy'
-            / 'summary_demog_metrics.csv'
-        )
-
-        if not metrics_path.exists():
-            raise FileNotFoundError(
-                "summary_demog_metrics.csv not found. "
-                "Run distributional_accuracy() first."
-            )
-
-        df = pd.read_csv(metrics_path)
-
-        self._rank_scatter_plot(
-            df=df,
-            split=split,
-            save_filename=f"{self.train_plan}_kl_vs_wd_rank_scatter.png",
-            show=show_plots
-        )
-
-        self._alluvial_plot(
-            df=df,
-            split=split,
-            save_filename=f"{self.train_plan}_kl_vs_wd_alluvial.png",
             show=show_plots
         )

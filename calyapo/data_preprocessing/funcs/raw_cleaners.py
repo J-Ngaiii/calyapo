@@ -1,10 +1,11 @@
 import pandas as pd
 import numpy as np
-from typing import List, Union
+from typing import List
 from pathlib import Path
 
 from calyapo.configurations.config import IGS_RACE_MAP, UNIVERSAL_NA_FILLER
-from calyapo.data_preprocessing.cleaning_objects import DataPackage
+from calyapo.configurations.data_mappings import IGS_MAPS
+from calyapo.data_preprocessing.cleaning_objects import DataPackage, unique_id_generator
 from calyapo.utils.persistence import *
 
 def _process_single_df(df: pd.DataFrame, period: str, mode: str = 'IGS', debug: bool = False) -> pd.DataFrame:
@@ -43,6 +44,9 @@ def _process_single_df(df: pd.DataFrame, period: str, mode: str = 'IGS', debug: 
             df['racial_id'] = collapsed.values
             if debug:
                 print(f"(process_single | Debug) final df race col and time col:\n{df[['racial_id', 'time_period']]}")
+
+        id_col = [key for key, value in IGS_MAPS[period]['var2label'].items() if value == 'dataset_id'][0]
+        df['calyapo_uniqueid'] = unique_id_generator(base_ids=df[id_col], time_period=period)
     elif mode == 'CES':
         pass
     return df
