@@ -767,7 +767,8 @@ class Reporter:
         families = {
             "llama3.1": df[df["Model"].str.contains("llama-3.1", case=False)],
             "llama3.2": df[df["Model"].str.contains("llama-3.2", case=False)],
-            "qwen14b": df[df["Model"].str.contains("qwen", case=False)],
+            "qwen7b": df[df["Model"].str.contains("qwen-2.5-7b", case=False)],
+            "qwen14b": df[df["Model"].str.contains("qwen-2.5-14b", case=False)],
         }
 
 
