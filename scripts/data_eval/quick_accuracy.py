@@ -22,10 +22,10 @@ def calculate_accuracy(results_path: str, split: str, model_name: str):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Runs analysis of offline inference data.") 
-    parser.add_argument("--train_plan", type=str, nargs='?', default='opinion_school', help="Name of training plan.")
+    parser.add_argument("--train_plan", type=str, nargs='?', default='presidents_to_abortion', help="Name of training plan.")
     parser.add_argument("--run_keyword", type=str, nargs='?', default='archon', help="Keyword corresponding with inference run.")
-    parser.add_argument("--model_idx", type=str, nargs='?', default='1', help="Integer assigned to a model.")
-    parser.add_argument("--jsonl", type=str, nargs='?', default='results_validation_os_lora_20260503_182103.jsonl', help="Exact json file with results.")
+    parser.add_argument("--model_idx", type=str, nargs='?', default='7', help="Integer assigned to a model.")
+    parser.add_argument("--jsonl", type=str, nargs='?', default='results_test_p2a_socrates_20260514_002631.jsonl', help="Exact json file with results.")
     
     args = parser.parse_args()
     
@@ -37,6 +37,7 @@ if __name__ == "__main__":
         '4' : f"meta-llama/Llama-3.2-3B-Instruct", 
         '5': f"Qwen/Qwen2.5-14B", 
         '6': f"Qwen/Qwen2.5-14B-Instruct", 
+        '7': f"socratesft/socrates-qwen2.5-14b-dpo"
     }
 
     IN_PATH = f"inference_outputs/{args.train_plan}/outputs_{args.run_keyword}/{LOOKUP[args.model_idx]}/{args.jsonl}"
