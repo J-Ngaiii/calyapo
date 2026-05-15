@@ -25,7 +25,7 @@ if __name__ == "__main__":
     parser.add_argument("--train_plan", type=str, nargs='?', default='presidents_to_abortion', help="Name of training plan.")
     parser.add_argument("--run_keyword", type=str, nargs='?', default='archon', help="Keyword corresponding with inference run.")
     parser.add_argument("--model_idx", type=str, nargs='?', default='7', help="Integer assigned to a model.")
-    parser.add_argument("--jsonl", type=str, nargs='?', default='results_test_p2a_socrates_20260514_002631.jsonl', help="Exact json file with results.")
+    parser.add_argument("--jsonl", type=str, nargs='?', default='results_test_os_socrates-qwen2.5-14b-dpo_20260514_005606.jsonl', help="Exact json file with results.")
     
     args = parser.parse_args()
     

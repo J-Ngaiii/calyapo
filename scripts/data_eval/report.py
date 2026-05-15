@@ -60,7 +60,8 @@ def main():
         # print(f"Step 5 (Geographic Analysis) Complete!")
 
         print(f"Beginning Step 6 (Prediction Stacked Bar Analysis)...\n")
-        rep.prediction_distribution_analysis(split='test')
+        rep.prediction_distribution_analysis(split='test', granular=True)
+        rep.prediction_distribution_analysis(split='test', granular=False)
         print(f"\nStep 6 (Prediction Stacked Bar Analysis) Complete!\n")
 
         print(f"Beginning Step 7 (Distribution Alignment Plots)...\n")

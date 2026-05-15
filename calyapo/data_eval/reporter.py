@@ -1010,17 +1010,29 @@ class Reporter:
             ]
 
         ax.set_ylim(0, 1)
-        ax.set_ylabel("Proportion of Predictions")
-        ax.set_title(f"{'Granular' if granular else 'General'} Output Distribution ({split.capitalize()})")
-        plt.xticks(rotation=45, ha="right")
+        ax.set_ylabel("Proportion of Predictions", fontsize=16)
+        ax.set_title(
+            f"{'Granular' if granular else 'General'} Token Prediction Distribution ({split.capitalize()} Set)",
+            fontsize=18
+        )
+        ax.set_title(f"{'Granular' if granular else 'General'} Token Prediction Distribution ({split.capitalize()} Set)")
+        plt.xticks(rotation=45, ha="right", fontsize=14)
         
         # Place legend outside to handle long lists of raw tokens
-        ax.legend(handles=legend_handles, title="Legend", bbox_to_anchor=(1.01, 1), loc="upper left", fontsize='small')
+        ax.legend(
+            handles=legend_handles,
+            title="Legend",
+            bbox_to_anchor=(1.01, 1),
+            loc="upper left",
+            fontsize=13,
+            title_fontsize=14
+        )
 
         plt.tight_layout()
         if save_filename:
-            self.results_folder.mkdir(parents=True, exist_ok=True)
-            plt.savefig(self.results_folder / save_filename, dpi=300, bbox_inches="tight")
+            folder_path = Path(f"{self.graphs_folder}/{split}")
+            folder_path.mkdir(parents=True, exist_ok=True)
+            plt.savefig(folder_path / save_filename, dpi=300, bbox_inches="tight")
         if show:
             plt.show()
         plt.close()
@@ -1134,6 +1146,109 @@ class Reporter:
 
             if self.verbose:
                 print(f"Saved heatmap to: {save_path}")
+
+        if show:
+            plt.show()
+
+        plt.close()
+
+    def _compute_base_lora_deltas(self, df: pd.DataFrame, metric: str) -> pd.DataFrame:
+        """
+        Computes LoRA - Base at the DEMOGRAPHIC level.
+        """
+
+        base = df[df["Model"].str.contains("base")].copy()
+        lora = df[df["Model"].str.contains("lora")].copy()
+
+        base["Model_root"] = base["Model"].str.replace("_base", "", regex=False)
+        lora["Model_root"] = lora["Model"].str.replace("_lora", "", regex=False)
+
+        merged = base.merge(
+            lora,
+            on=["Split", "Question", "Demographic", "Model_root"],
+            suffixes=("_base", "_lora")
+        )
+
+        out = pd.DataFrame({
+            "Model": merged["Model_root"],
+            "Demographic": merged["Demographic"],
+            "Delta": merged[f"{metric}_lora"] - merged[f"{metric}_base"],
+            "Split": merged["Split"]
+        })
+
+        return out
+    
+    def _prepare_delta_heatmap_df(self, delta_df: pd.DataFrame, metric: str) -> pd.DataFrame:
+        """
+        Aggregates deltas across questions + subgroups.
+        """
+
+        col = f"{metric}_delta"
+
+        agg = (
+            delta_df
+            .groupby(["Model_root", "Demographic"])[col]
+            .mean()
+            .reset_index()
+        )
+
+        pivot = agg.pivot(
+            index="Model_root",
+            columns="Demographic",
+            values=col
+        )
+
+        return pivot
+    
+    def _plot_base_lora_delta_heatmap(
+        self,
+        df: pd.DataFrame,
+        metric: str = "KL_Weighted",
+        split: str = "test",
+        save_filename: str = None,
+        show: bool = False
+    ):
+        """
+        Heatmap:
+            rows = models
+            cols = demographics
+            values = (LoRA - Base)
+        """
+
+        delta_df = self._compute_base_lora_deltas(df, metric)
+
+        delta_df = delta_df[delta_df["Split"] == split]
+
+        pivot = delta_df.pivot_table(
+            index="Model",
+            columns="Demographic",
+            values="Delta",
+            aggfunc="mean"
+        )
+
+        plt.figure(figsize=(12, 7))
+
+        sns.heatmap(
+            pivot,
+            annot=True,
+            fmt=".3f",
+            cmap="RdYlGn_r",
+            center=0,
+            linewidths=0.5,
+            cbar_kws={"label": f"{metric} (LoRA - Base)"}
+        )
+
+        plt.title(f"LoRA vs Base Δ{metric} ({split.capitalize()} set)")
+        plt.xlabel("Demographic")
+        plt.ylabel("Model")
+
+        plt.tight_layout()
+
+        if save_filename:
+            folder_path = Path(f"{self.graphs_folder}/{split}")
+            folder_path.mkdir(parents=True, exist_ok=True)
+            save_path = folder_path / save_filename
+            plt.savefig(save_path, dpi=300, bbox_inches="tight")
 
         if show:
             plt.show()
@@ -1486,6 +1601,13 @@ class Reporter:
             score=score,
             save_filename=f"{self.train_plan}_{score}_heatmap_best.png",
             show=show_plots
+        )
+
+        self._plot_base_lora_delta_heatmap(
+            df=df,
+            split=split,
+            metric=score,
+            save_filename=f"{score}_base_vs_lora_heatmap.png"
         )
 
         self._distribution_violinplot(
