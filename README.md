@@ -33,8 +33,8 @@ The following models were evaluated:
 | `meta-llama/Llama-3.1-8B-Instruct` | 8B | Instruction-tuned |
 | `meta-llama/Llama-3.2-3B` | 3B | Base |
 | `meta-llama/Llama-3.2-3B-Instruct` | 3B | Instruction-tuned |
-| `Qwen/Qwen2.5-7B` | 14B | Base |
-| `Qwen/Qwen2.5-7B-Instruct` | 14B | Instruction-tuned |
+| `Qwen/Qwen2.5-7B` | 7B | Base |
+| `Qwen/Qwen2.5-7B-Instruct` | 7B | Instruction-tuned |
 | `Qwen/Qwen2.5-14B` | 14B | Base |
 | `Qwen/Qwen2.5-14B-Instruct` | 14B | Instruction-tuned |
 
