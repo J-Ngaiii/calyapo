@@ -1,6 +1,6 @@
 # CalYAPo
 
-CalYAPo is a research repository for finetuning large language models (LLMs) on California sub-national public opinion data, developed as part of a Data Science Honors Thesis at UC Berkeley. The project investigates whether LLMs finetuned with Low-Rank Adaptation (LoRA) on state-level survey data can accurately predict individual-level survey responses and if such individual-level predictive performance produces trades-offs against aggregate distributional alignment.
+CalYAPo is a research repository for finetuning large language models (LLMs) on California sub-national public opinion data, developed as part of my Data Science Honors Thesis at UC Berkeley. The project investigates whether LLMs finetuned with Low-Rank Adaptation (LoRA) on state-level survey data can accurately predict individual-level survey responses and if such individual-level predictive performance produces trades-offs against aggregate distributional alignment.
 
 The dataset (~19,000 individuals) is constructed from California-specific survey data collected by the [Berkeley Institute of Governmental Studies (IGS)](https://igs.berkeley.edu/).
 
