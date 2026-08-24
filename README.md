@@ -61,8 +61,6 @@ Expected raw data sources and their locations:
 | Source | Format | Path |
 |--------|--------|------|
 | IGS (California) | `.sav` / `.dta` | `data/raw/igs/` |
-| ANES (National) | `.sav` / `.dta` | `data/raw/anes/` |
-| PPIC (California) | `.csv` | `data/raw/ppic/` |
 
 ---
 
@@ -272,10 +270,10 @@ Key execution steps:
 If you use CalYAPo in your research, please cite:
 
 ```bibtex
-@thesis{ngai2025calyapo,
+@thesis{ngai2026calyapo,
   author = {Ngai, Jonathan},
-  title  = {[TODO: Thesis title]},
+  title  = {CalYAPo: Simulating California Political Opinion with LoRA Finetuned Large Language Models},
   school = {University of California, Berkeley},
-  year   = {2025}
+  year   = {2026}
 }
 ```
